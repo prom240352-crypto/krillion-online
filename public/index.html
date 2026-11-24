@@ -1,0 +1,2474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Krillion · the daily dive</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <style>
+    :root {
+      --card-cyan: #50e0f8;
+      --coral-pink: #e6557e;
+      --coral-shadow: #e66491;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: #07111b; color: #eef6ff;
+      font-family: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+      overflow-x: hidden;
+    }
+    .mono { font-family: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .pixel-art { image-rendering: pixelated; image-rendering: crisp-edges; }
+    #sceneCanvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+    .crt-scanlines {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(8,26,42,0.10) 2px, rgba(8,26,42,0.10) 4px);
+    }
+    .corner-btn {
+      width: 44px; height: 38px; background: rgba(40, 66, 91, 0.88); border: 2px solid #0e1c2b;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 2px 0 rgba(7,17,27,0.55);
+      display: flex; align-items: center; justify-content: center; color: #b7d2e6; cursor: pointer;
+      transition: background 0.12s ease, transform 0.08s ease;
+    }
+    .corner-btn:hover { background: rgba(56, 87, 115, 0.96); color: #ffffff; }
+    .corner-btn:active { transform: translateY(1px); }
+    .cyan-box {
+      position: relative; background: rgba(17, 29, 51, 0.94); border: 3px solid var(--card-cyan);
+      box-shadow: 0 0 14px rgba(80, 224, 248, 0.24), inset 0 0 18px rgba(80, 224, 248, 0.06);
+      transition: border-color 0.12s ease, background 0.12s ease, transform 0.08s ease;
+    }
+    .cyan-box:hover { background: rgba(22, 39, 68, 0.97); }
+    .cyan-box:active { border-color: var(--coral-pink); transform: translateY(1px); }
+    .beta-tab {
+      position: absolute; top: -12px; left: 16px; background: var(--card-cyan); color: #071422;
+      font-size: 10px; font-weight: 800; letter-spacing: 0.14em; padding: 2px 10px; border: 2px solid #081422; text-transform: uppercase;
+    }
+    .bottom-nav-btn {
+      background: rgba(7, 20, 37, 0.92); border: 1px solid #1d354f; color: #8ba6c2;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      padding: 11px 6px; display: flex; align-items: center; justify-content: center; gap: 5px;
+      transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    }
+    .bottom-nav-btn:hover { border-color: var(--card-cyan); color: #eef6ff; background: rgba(16, 34, 58, 0.95); }
+    .modal-shell { position: fixed; inset: 0; z-index: 45; background: rgba(7, 17, 29, 0.97); overflow-y: auto; }
+    .menu-tile {
+      background: #0b182a; border: 1px solid #1c314a; padding: 18px 12px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center;
+      transition: border-color 0.14s ease, background 0.14s ease;
+    }
+    .menu-tile:hover { background: #10223a; border-color: #50e0f8; }
+    .menu-tile-active { border: 2px solid var(--coral-pink); }
+    .retro-switch {
+      width: 68px; height: 28px; background: #07111e; border: 1.5px solid #28425b;
+      position: relative; cursor: pointer; display: flex; align-items: center; padding: 2px;
+    }
+    .retro-switch-knob {
+      width: 30px; height: 22px; background: #2b445e; color: #9db8cf; font-size: 9px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center; transition: transform 0.16s ease, background 0.16s ease;
+    }
+    .retro-switch.on { border-color: #50e0f8; }
+    .retro-switch.on .retro-switch-knob { transform: translateX(32px); background: #50e0f8; color: #061321; }
+    .hud-bevel {
+      background: rgba(8, 20, 36, 0.94); border: 2px solid #213c58;
+      clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px);
+    }
+    .ocean-panel { background: rgba(11, 23, 40, 0.94); border: 2px solid #203c59; box-shadow: 0 18px 46px rgba(0, 6, 16, 0.65); }
+    @keyframes popIn { 0% { transform: scale(0.86) translateY(10px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+    .animate-pop { animation: popIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    @keyframes shakeX { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+    .shake-x { animation: shakeX 0.22s ease-in-out; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #07111b; }
+    ::-webkit-scrollbar-thumb { background: #22405d; }
+  </style>
+</head>
+<body class="min-h-screen w-full relative select-none">
+  <canvas id="sceneCanvas"></canvas>
+  <div class="crt-scanlines"></div>
+
+  <!-- Home Corner Controls -->
+  <div id="homeTopControls">
+    <div class="fixed top-3.5 left-3.5 z-30">
+      <button id="menuToggleBtn" aria-label="Open menu" class="corner-btn">
+        <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><rect x="3" y="4" width="14" height="2"/><rect x="3" y="9" width="14" height="2"/><rect x="3" y="14" width="14" height="2"/></svg>
+      </button>
+    </div>
+    <div class="fixed top-14 right-3.5 z-30 flex flex-col gap-1">
+      <button id="soundToggleBtn" aria-label="Toggle sound" class="corner-btn">
+        <svg id="iconSoundOn" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+        <svg id="iconSoundOff" class="w-4 h-4 hidden opacity-60" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+      </button>
+      <button id="topSettingsBtn" aria-label="Settings" class="corner-btn">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58-1.92-3.32-2.39.96a7.2 7.2 0 0 0-1.62-.94l-.36-2.54h-3.84l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96-1.92 3.32 2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58 1.92 3.32 2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54h3.84l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96 1.92-3.32-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
+      </button>
+      <button id="topSkinsBtn" aria-label="Diver Skins" class="corner-btn">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M16 3l5 3-2 4-2-1v12H7V9l-2 1-2-4 5-3c.6 1.2 2.1 2 4 2s3.4-.8 4-2z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL 1: 2-COLUMN MENU -->
+  <div id="menuModal" class="modal-shell hidden">
+    <div class="max-w-[494px] mx-auto px-5 py-6 min-h-screen flex flex-col">
+      <div class="flex items-start justify-between mb-6">
+        <div>
+          <div class="text-[10px] tracking-[0.26em] text-[#6d8ba8] uppercase mb-1">KRILLION</div>
+          <svg viewBox="0 0 180 42" class="w-36 h-auto pixel-art"><g id="menuLogoShadow" fill="#e66491" transform="translate(-3, 3)"></g><g id="menuLogoFace" fill="#f2f7fa"></g></svg>
+        </div>
+        <button id="menuCloseBtn" class="w-10 h-10 bg-[#0d1c30] border border-[#243d59] hover:border-[#50e0f8] text-[#b8d3e8] font-bold flex items-center justify-center">X</button>
+      </div>
+      <div class="text-[10px] font-bold tracking-[0.22em] text-[#5e7d9b] uppercase mb-3">DIVE IN</div>
+      <div class="grid grid-cols-2 gap-3 mb-5">
+        <button data-nav="daily" class="menu-tile menu-tile-active"><span class="text-xl text-[#e6557e] font-bold">↓</span><span class="text-[11px] font-bold tracking-[0.18em] text-[#eef6ff] uppercase">DAILY DIVE</span></button>
+        <button data-nav="unlimited" class="menu-tile"><span class="text-xl text-[#7d9ab8] font-bold">∞</span><span class="text-[11px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase">UNLIMITED</span></button>
+        <button data-nav="pufferLobby" class="menu-tile"><img id="menuPufferImg" alt="Puffer" class="w-8 h-8 object-contain pixel-art" /><span class="text-[11px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase">PUFFER PARTY</span></button>
+        <button data-nav="archive" class="menu-tile"><span class="text-xl text-[#7d9ab8]">⟲</span><span class="text-[11px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase">ARCHIVE</span></button>
+        <button data-nav="packs" class="menu-tile"><svg class="w-5 h-5 text-[#7d9ab8]" viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="2" width="6" height="6"/><rect x="12" y="2" width="6" height="6"/><rect x="2" y="12" width="6" height="6"/><rect x="12" y="12" width="6" height="6"/></svg><span class="text-[11px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase">THEMED PACKS</span></button>
+        <button data-nav="mykrillion" class="menu-tile"><svg class="w-5 h-5 text-[#7d9ab8]" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg><span class="text-[11px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase">MY KRILLION</span></button>
+        <button data-nav="friends" class="menu-tile"><svg class="w-5 h-5 text-[#7d9ab8]" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3.5 3.5-5.5 7-5.5s7 2 7 5.5"/><path d="M16 14.8c2.8.3 6 1.8 6 5.2h-4.5"/></svg><span class="text-[11px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase">FRIENDS</span></button>
+        <button data-nav="settings" class="menu-tile"><svg class="w-5 h-5 text-[#7d9ab8]" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58-1.92-3.32-2.39.96a7.2 7.2 0 0 0-1.62-.94l-.36-2.54h-3.84l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96-1.92 3.32 2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58 1.92 3.32 2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54h3.84l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96 1.92-3.32-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg><span class="text-[11px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase">SETTINGS</span></button>
+        <button data-nav="how" class="menu-tile"><span class="text-lg font-black text-[#7d9ab8]">?</span><span class="text-[11px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase">FAQ</span></button>
+      </div>
+      <div class="border-t border-[#182b42] pt-4 space-y-2.5 mt-auto">
+        <button data-nav="merch" class="w-full p-4 bg-[#0b182a] border border-[#1c314a] hover:border-[#e6557e] flex items-center justify-between text-left">
+          <div class="flex items-center gap-3"><svg class="w-5 h-5 text-[#e6557e]" viewBox="0 0 24 24" fill="currentColor"><path d="M16 3l5 3-2 4-2-1v12H7V9l-2 1-2-4 5-3c.6 1.2 2.1 2 4 2s3.4-.8 4-2z"/></svg><div><div class="text-xs font-bold tracking-[0.16em] text-white uppercase">MERCH</div><div class="text-[11px] text-[#6d8ba8]">Tees, sweats & caps</div></div></div>
+          <span class="text-[#e6557e] text-sm font-bold">↗</span>
+        </button>
+        <button id="menuChainleBtn" class="w-full p-4 bg-[#0b182a] border border-[#1c314a] hover:border-[#50e0f8] flex items-center justify-between text-left">
+          <div><div class="text-xs font-bold tracking-[0.16em] text-[#50e0f8] uppercase">TRY CHAINLE</div><div class="text-[11px] text-[#6d8ba8]">Fun word association game made by my little brother</div></div>
+          <span class="text-[#50e0f8] text-sm font-bold">↗</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: DIVER SKINS -->
+  <div id="skinsModal" class="modal-shell hidden">
+    <div class="max-w-[494px] mx-auto px-4 py-5 min-h-screen flex flex-col">
+      <div class="flex items-center justify-between mb-4">
+        <button id="skinsMenuBtn" class="w-9 h-9 bg-[#0d1c30] border border-[#243d59] text-[#b8d3e8] flex items-center justify-center">☰</button>
+        <div class="text-[11px] font-bold tracking-[0.2em] text-[#50e0f8] uppercase">DIVER SKINS</div>
+        <button id="skinsCloseBtn" class="w-9 h-9 bg-[#0d1c30] border border-[#243d59] hover:border-[#50e0f8] text-[#b8d3e8] font-bold flex items-center justify-center">X</button>
+      </div>
+      <div id="skinsGrid" class="grid grid-cols-2 gap-3 pb-8"></div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: SETTINGS -->
+  <div id="settingsModal" class="modal-shell hidden">
+    <div class="max-w-[494px] mx-auto px-5 py-5 min-h-screen flex flex-col">
+      <div class="flex items-center justify-between mb-6">
+        <button id="settingsMenuBtn" class="w-9 h-9 bg-[#0d1c30] border border-[#243d59] text-[#b8d3e8] flex items-center justify-center">☰</button>
+        <div class="text-[11px] font-bold tracking-[0.22em] text-[#eef6ff] uppercase">SETTINGS</div>
+        <button id="settingsCloseBtn" class="w-9 h-9 bg-[#0d1c30] border border-[#243d59] hover:border-[#50e0f8] text-[#b8d3e8] font-bold flex items-center justify-center">X</button>
+      </div>
+      <div class="space-y-5 flex-1">
+        <div class="flex items-start justify-between gap-4 pb-4 border-b border-[#14263b]"><div><div class="text-xs font-bold tracking-[0.16em] text-[#eef6ff] uppercase">LOW-POWER MODE</div><div class="text-[11px] text-[#6d8ba8] mt-1">Lighter graphics and fewer background animations.</div></div><button id="swLowPower" class="retro-switch shrink-0"><span class="retro-switch-knob">OFF</span></button></div>
+        <div class="flex items-start justify-between gap-4 pb-4 border-b border-[#14263b]"><div><div class="text-xs font-bold tracking-[0.16em] text-[#eef6ff] uppercase">COLORBLIND MODE</div><div class="text-[11px] text-[#6d8ba8] mt-1">Brighter text and more separated tier colors.</div></div><button id="swColorblind" class="retro-switch shrink-0"><span class="retro-switch-knob">OFF</span></button></div>
+        <div class="flex items-start justify-between gap-4 pb-4 border-b border-[#14263b]"><div><div class="text-xs font-bold tracking-[0.16em] text-[#eef6ff] uppercase">ANSWER CORRECTIONS</div><div class="text-[11px] text-[#6d8ba8] mt-1">Preview corrected answers before scoring. Off accepts them immediately.</div></div><button id="swCorrections" class="retro-switch on shrink-0"><span class="retro-switch-knob">ON</span></button></div>
+        <div class="flex items-start justify-between gap-4 pb-4 border-b border-[#14263b]"><div><div class="text-xs font-bold tracking-[0.16em] text-[#eef6ff] uppercase">CLEAR REJECTED ENTRIES</div><div class="text-[11px] text-[#6d8ba8] mt-1">Empty the answer box after a failed attempt.</div></div><button id="swClearRejected" class="retro-switch shrink-0"><span class="retro-switch-knob">OFF</span></button></div>
+                <div class="flex items-start justify-between gap-4 pb-4 border-b border-[#14263b]"><div><div class="text-xs font-bold tracking-[0.16em] text-[#eef6ff] uppercase">OCEAN AMBIENCE & VOICE</div><div class="text-[11px] text-[#6d8ba8] mt-1">Deep underwater soundscape & tier voice callouts.</div></div><button id="swAmbience" class="retro-switch on shrink-0"><span class="retro-switch-knob">ON</span></button></div>
+        <div class="flex items-start justify-between gap-4 pb-4 border-b border-[#14263b]"><div><div class="text-xs font-bold tracking-[0.16em] text-[#eef6ff] uppercase">SHARE LINK</div><div class="text-[11px] text-[#6d8ba8] mt-1">Add a krillion.io link under shared results.</div></div><button id="swShareLink" class="retro-switch shrink-0"><span class="retro-switch-knob">OFF</span></button></div>
+        <div class="pt-2">
+          <div class="text-[10px] font-bold tracking-[0.2em] text-[#5c7894] uppercase mb-3">ACCOUNT & PURCHASES</div>
+          <button id="settingsMyKrillionBtn" class="w-full py-3.5 bg-[#0b182a] border border-[#243d59] hover:border-[#50e0f8] text-xs font-bold tracking-[0.18em] text-[#eef6ff] uppercase mb-4">MY KRILLION →</button>
+          <div class="flex items-center justify-between gap-3"><div class="text-[11px] text-[#6d8ba8]">Unlocked on another device?</div><button id="settingsRestoreBtn" class="px-4 py-2 bg-[#0b182a] border border-[#243d59] hover:border-[#50e0f8] text-[11px] font-bold tracking-[0.16em] text-[#cce4f7] uppercase">RESTORE</button></div>
+        </div>
+      </div>
+      <div class="pt-6 pb-2 flex items-center gap-4 text-[10px] tracking-[0.16em] text-[#5e7b97] uppercase">
+        <button id="setPrivBtn" class="hover:text-white">PRIVACY</button><button data-nav="how" class="hover:text-white">FAQ</button><button id="setIgBtn" class="hover:text-white">INSTAGRAM</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW 1: HOME SCREEN -->
+  <section id="viewHome" class="relative z-10 min-h-screen w-full max-w-[494px] mx-auto flex flex-col justify-between px-4 pb-4">
+    <div class="flex flex-col items-center justify-between" style="height: 64vh; min-height: 360px;">
+      <div class="w-full flex flex-col items-center text-center pt-[14vh] sm:pt-[15vh]">
+        <svg viewBox="0 0 380 56" class="w-[82%] max-w-[340px] h-auto pixel-art drop-shadow-sm"><g id="logoShadow" fill="#e66491" transform="translate(-4, 4)"></g><g id="logoFace" fill="#f2f7fa"></g></svg>
+        <div class="mt-3 text-[15px] sm:text-[17px] font-bold tracking-[0.38em] text-[#2c7fa3] uppercase" style="text-shadow: 0 1px 0 rgba(255,255,255,0.45);">THE DAILY DIVE</div>
+        <div class="mt-4 px-10 text-[10px] sm:text-[12px] font-bold tracking-[0.06em] text-[#4a7490] leading-relaxed">
+          <div>7 prompts · 25 seconds each · rarer answers</div><div>sink deeper</div>
+        </div>
+      </div>
+      <div class="w-full flex flex-col items-start pb-1">
+        <button id="homeHowBtn" class="text-[11px] font-bold tracking-[0.16em] text-[#4c738f] hover:text-[#17364d] uppercase mb-2 flex items-center gap-1.5"><span class="text-[9px]">▸</span> HOW TO PLAY</button>
+        <button id="homePrivacyBtn" class="text-[11px] underline underline-offset-2 text-[#bdd4e4] hover:text-white translate-y-2">Privacy</button>
+      </div>
+    </div>
+    <div class="w-full flex flex-col gap-3 pt-2.5 pb-1">
+      <button id="startPufferBtn" class="cyan-box w-full px-4 py-4 flex items-center justify-between text-left">
+        <span class="beta-tab">BETA · LIMITED TIME</span>
+        <span class="flex items-center gap-3"><img id="homePufferIcon" src="/sprites/puffer.png" alt="Puffer" class="w-9 h-9 object-contain pixel-art" /><span class="text-[16px] sm:text-[18px] font-bold tracking-[0.22em] text-[#eef6ff] uppercase">PUFFER PARTY</span></span>
+        <span class="flex items-center gap-1.5 text-[11px] text-[#7c9ab8] shrink-0"><span class="inline-block w-1.5 h-1.5 bg-[#50e0f8]"></span><span id="livePlayingCount" class="mono">10,534 playing</span></span>
+      </button>
+      <button id="startDailyBtn" class="cyan-box w-full py-4 px-4 flex items-center justify-center gap-4">
+        <span class="text-[12px] text-[#eef6ff]">▼</span><span class="text-[16px] sm:text-[18px] font-bold tracking-[0.24em] text-[#eef6ff] uppercase">BEGIN DESCENT</span><span class="text-[12px] text-[#eef6ff]">▼</span>
+      </button>
+      <div class="text-[11px] font-bold tracking-[0.16em] text-[#6d8ba8] uppercase pt-0.5">DIVE #132</div>
+      <div class="grid grid-cols-3 gap-2">
+        <button id="homeArchiveBtn" class="bottom-nav-btn"><span>ARCHIVE</span><span class="text-[12px]">⟲</span></button>
+        <button id="homePacksBtn" class="bottom-nav-btn"><span>THEMED PACKS</span></button>
+        <button id="homeUnlimitedBtn" class="bottom-nav-btn"><span>UNLIMITED</span><span class="text-[13px]">∞</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 2: LIVE DESCENT GAMEPLAY (Exact Real-Site Plunge + Center Tier Reveal + DESCEND ▼ / SURFACE ▲!) -->
+  <section id="viewPlay" class="hidden relative z-10 min-h-screen w-full max-w-[494px] mx-auto px-3 pt-2.5 pb-5 flex flex-col justify-between">
+    <!-- Top Arcade HUD -->
+    <div>
+      <div class="flex items-start justify-between gap-2">
+        <div class="hud-bevel px-3.5 py-1.5 min-w-[92px]">
+          <div class="text-[9px] tracking-[0.18em] text-[#6d8ba8] uppercase">DEPTH</div>
+          <div id="hudDepthMeters" class="text-base sm:text-lg font-black mono text-[#50e0f8] leading-tight">0m</div>
+        </div>
+        <div class="flex-1 flex flex-col items-center pt-1.5">
+          <div id="promptProgressWrap" class="flex items-center gap-1.5"></div>
+          <div id="hudPromptSub" class="text-[9px] tracking-[0.2em] text-[#7ea4c4] uppercase mt-1.5 font-bold">PROMPT 1 OF 7</div>
+        </div>
+        <div class="hud-bevel px-3.5 py-1.5 min-w-[92px] text-right">
+          <div class="text-[9px] tracking-[0.18em] text-[#6d8ba8] uppercase">SCORE</div>
+          <div id="hudScoreVal" class="text-base sm:text-lg font-black mono text-white leading-tight">0</div>
+        </div>
+      </div>
+      <div class="flex items-center justify-between mt-2">
+        <button id="playMenuBtn" class="corner-btn" style="width:38px;height:32px;" aria-label="Menu">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><rect x="3" y="4" width="14" height="2"/><rect x="3" y="9" width="14" height="2"/><rect x="3" y="14" width="14" height="2"/></svg>
+        </button>
+        <button id="playSoundBtn" class="corner-btn" style="width:38px;height:32px;" aria-label="Sound">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- CENTER STAGE: switches cleanly between Prompt Card -> Answer Capsule -> Full Plunge -> Center Rarity Reveal! -->
+    <div class="my-auto py-3 flex flex-col items-center justify-center w-full">
+      <!-- Prompt Card (Hidden during plunge & reveal so you see the full ocean rushing past!) -->
+      <div id="promptCardBox" class="w-full bg-[#0c1a2e]/95 border-2 border-[#213d5c] p-5 sm:p-6 shadow-2xl transition-all duration-300">
+        <div id="promptPackLabel" class="text-[11px] font-bold uppercase tracking-[0.2em] text-[#e66491] mb-2">PROMPT 1 OF 7</div>
+        <h2 id="promptQuestion" class="text-lg sm:text-[21px] font-bold text-[#f2f7fa] leading-snug tracking-wide">
+          Name a sport where you're allowed to kick the ball
+        </h2>
+        <div class="text-[10px] tracking-[0.18em] text-[#5e7c99] uppercase mt-4">▼ rarer answers sink deeper ▼</div>
+      </div>
+
+      <!-- Brief Submitted Answer Capsule ("SEPAK TAKRAW" ▼) right before plunge -->
+      <div id="submittedCapsule" class="hidden mt-3 px-4 py-1.5 bg-[#081525]/95 border border-[#50e0f8]/60 text-xs font-black tracking-[0.18em] text-[#50e0f8] uppercase animate-pop"></div>
+
+      <!-- CENTER-SCREEN RARITY REVEAL BANNER (Exact match to live krillion.io playthrough!) -->
+      <div id="tierRevealBanner" class="hidden w-full text-center px-4 py-5 animate-pop">
+        <div class="flex justify-center mb-2">
+          <img id="revealCreatureIcon" alt="Tier" class="w-16 h-16 object-contain pixel-art drop-shadow-lg" />
+        </div>
+        <div id="revealTierTitle" class="text-3xl sm:text-4xl font-black tracking-[0.2em] uppercase" style="text-shadow: 0 0 24px currentColor;">RARE</div>
+        <div id="revealAnswerQuote" class="text-base sm:text-lg font-bold text-white tracking-[0.12em] uppercase mt-2">"SEPAK TAKRAW"</div>
+        <div id="revealPtsDepth" class="text-xs sm:text-sm font-black mono tracking-[0.14em] mt-2 text-[#50e0f8]">+60 PTS · sink 600m</div>
+        <div id="revealFlavor" class="text-xs text-[#9cb8d4] italic mt-2">"Genuinely uncommon. Nice pull."</div>
+      </div>
+
+      <!-- Checking Result Overlay (Before surfacing after Prompt 7) -->
+      <div id="checkingOverlay" class="hidden text-center py-6 animate-pop">
+        <div class="text-sm font-black tracking-[0.26em] text-[#50e0f8] uppercase">CHECKING YOUR RESULT...</div>
+      </div>
+    </div>
+
+    <!-- BOTTOM DOCK -->
+    <div class="w-full space-y-2">
+      <!-- "descending · the clock starts in 3" -->
+      <div id="descentCountdownBar" class="hidden w-full py-2.5 px-4 bg-[#071322]/92 border border-[#1d354f] text-center text-xs tracking-[0.18em] text-[#9eb9d2]">
+        descending · the clock starts in <span id="descentCountNum" class="text-[#50e0f8] font-black">3</span>
+      </div>
+
+      <!-- Inline Retry / Correction Echo Message -->
+      <div id="echoNotice" class="hidden text-center text-xs font-bold tracking-[0.06em] text-[#e88a5a]"></div>
+
+            <!-- Active Answer Input Bar -->
+      <form id="answerForm" autocomplete="off" class="hidden flex items-center gap-2.5 bg-[#071322]/95 border-t border-[#1a314a] pt-2.5 pb-1">
+        <div class="relative w-12 h-12 shrink-0 flex items-center justify-center">
+          <svg class="w-12 h-12 -rotate-90" viewBox="0 0 44 44">
+            <circle cx="22" cy="22" r="19" fill="#061220" stroke="#183049" stroke-width="3"></circle>
+            <circle id="timerRing" cx="22" cy="22" r="19" fill="none" stroke="#50e0f8" stroke-width="3" stroke-dasharray="119.38" stroke-dashoffset="0"></circle>
+          </svg>
+          <span id="timerText" class="absolute mono text-sm font-black text-[#50e0f8]">25</span>
+        </div>
+        <input id="answerInput" type="text" placeholder="type one answer..." class="flex-1 min-w-0 h-12 px-3.5 bg-[#06111e] border-2 border-[#254463] focus:border-[#50e0f8] focus:outline-none text-white placeholder-[#496987] text-sm sm:text-base font-bold" />
+        <button id="submitAnswerBtn" type="submit" class="h-12 px-5 bg-[#e64c78] hover:bg-[#f5628c] text-[#071422] font-black text-xs sm:text-sm tracking-[0.16em] uppercase shrink-0">DIVE</button>
+      </form>
+
+      <!-- DESCEND ▼ / SURFACE ▲ Button (Appears after plunge settles!) -->
+      <div id="descendActionWrap" class="hidden flex flex-col items-center gap-2">
+        <button id="descendNextBtn" type="button" class="w-full max-w-[280px] py-3.5 bg-[#0b1a2e]/95 border-2 border-[#50e0f8] hover:bg-[#132945] text-sm font-black tracking-[0.24em] text-[#eef6ff] uppercase transition">
+          DESCEND ▼
+        </button>
+      </div>
+
+      <div id="unlimitedFooter" class="hidden flex items-center justify-between text-[11px] text-[#7d9ab8] px-1">
+        <span id="unlimitedStats">Answered: 0 · Avg: 0 pts</span>
+        <button id="endUnlimitedBtn" type="button" class="text-[#50e0f8] hover:underline font-bold uppercase">Surface & Catch ▲</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 3: DIVE COMPLETE SUMMARY (Bell Curve + Dive Log + The Bearing + Expandable THE CATCH!) -->
+  <section id="viewResults" class="hidden relative z-10 min-h-screen w-full max-w-[494px] mx-auto px-4 pt-16 pb-10">
+    <div class="ocean-panel p-5 space-y-5 animate-pop">
+      <!-- Hero Score & Depth -->
+      <div class="text-center border-b border-[#182d44] pb-4">
+        <div id="resTitleTag" class="text-[10px] font-bold uppercase tracking-[0.24em] text-[#50e0f8]">DIVE #132 COMPLETE</div>
+        <div class="flex items-baseline justify-center gap-4 mt-2">
+          <div>
+            <div id="resTotalPts" class="text-5xl font-black mono text-white leading-none">415</div>
+            <div class="text-[9px] tracking-[0.18em] text-[#6d8ba8] uppercase mt-1">SCORE</div>
+          </div>
+          <div class="h-10 w-[1px] bg-[#1e3752]"></div>
+          <div>
+            <div id="resTotalDepth" class="text-3xl font-black mono text-[#50e0f8] leading-none">-4,150m</div>
+            <div class="text-[9px] tracking-[0.18em] text-[#6d8ba8] uppercase mt-1">DEPTH</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bell Curve SVG (0 - 700) with Pink YOU Marker -->
+      <div class="p-3.5 bg-[#06111e] border border-[#16293f]">
+        <div id="resPercentileText" class="text-center text-[11px] font-bold tracking-[0.14em] text-[#50e0f8] uppercase mb-2">BETTER THAN 77% OF TODAY'S PLAYERS</div>
+        <svg id="bellCurveSvg" viewBox="0 0 320 92" class="w-full h-24"></svg>
+        <div class="flex justify-between text-[9px] mono text-[#5a7794] mt-1 px-1">
+          <span>0</span><span>175</span><span>350</span><span>525</span><span>700</span>
+        </div>
+      </div>
+
+      <!-- DIVE LOG: DEEPER = RARER (7 Vertical Drop Lines!) -->
+      <div class="p-3.5 bg-[#06111e] border border-[#16293f]">
+        <div class="flex items-center justify-between text-[10px] font-bold tracking-[0.16em] uppercase mb-3">
+          <span class="text-[#cce4f7]">DIVE LOG</span>
+          <span class="text-[#6d8ba8]">DEEPER = RARER</span>
+        </div>
+        <div id="diveLogDrops" class="grid grid-cols-7 gap-1 h-28 items-start pt-1"></div>
+      </div>
+
+      <!-- THE BEARING (5 Score Bands) -->
+      <div class="p-3.5 bg-[#06111e] border border-[#16293f]">
+        <div class="text-[10px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase mb-2.5">THE BEARING</div>
+        <div id="bearingBands" class="grid grid-cols-5 gap-1 text-center"></div>
+      </div>
+
+      <!-- Share & Next Actions -->
+      <div class="flex gap-2">
+        <button id="shareResultBtn" class="flex-1 py-3 bg-[#e64c78] hover:bg-[#f5628c] text-[#071422] font-black text-xs uppercase tracking-[0.18em]">SHARE RESULT</button>
+        <button id="replayOrNextBtn" class="px-4 py-3 bg-[#091829] border border-[#50e0f8] text-[#50e0f8] font-bold text-xs uppercase tracking-[0.14em]">UNLIMITED ∞</button>
+      </div>
+
+      <!-- THE CATCH — TAP A ROUND FOR EVERY ANSWER -->
+      <div>
+        <div class="mb-2.5">
+          <h3 class="text-xs font-black uppercase tracking-[0.2em] text-[#eef6ff]">THE CATCH</h3>
+          <div class="text-[10px] text-[#6d8ba8] uppercase tracking-[0.12em]">TAP A ROUND FOR EVERY ANSWER</div>
+        </div>
+        <div id="catchList" class="space-y-2"></div>
+      </div>
+
+      <div class="pt-3 border-t border-[#16293f] text-center">
+        <button data-nav="home" class="text-xs uppercase tracking-[0.18em] text-[#50e0f8] hover:underline font-bold">▲ RETURN TO SURFACE</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 4: PUFFER PARTY LOBBY & MATCH -->
+  <section id="viewPufferLobby" class="hidden relative z-10 min-h-screen w-full max-w-[494px] mx-auto px-4 pt-16 pb-8">
+    <div class="text-center mb-5">
+      <svg viewBox="0 0 380 56" class="w-[62%] max-w-[230px] mx-auto h-auto pixel-art"><g id="pufferLogoShadow" fill="#e66491" transform="translate(-4, 4)"></g><g id="pufferLogoFace" fill="#f2f7fa"></g></svg>
+      <div class="text-xs font-bold tracking-[0.28em] text-[#50e0f8] uppercase mt-1.5">PUFFER PARTY</div>
+      <p class="text-xs text-[#cce4f7]/90 leading-relaxed max-w-sm mx-auto mt-3">Krillion's multiplayer category game. Name an answer and pass the puffer before it pops. Last one floating wins.</p>
+      <div class="my-3 flex justify-center"><img id="lobbyPufferSprite" alt="Puffer" class="w-16 h-16 object-contain pixel-art" /></div>
+    </div>
+    <div class="ocean-panel p-4 mb-3">
+      <div class="flex items-center justify-between mb-3"><span class="text-[11px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase">WHO'S PLAYING</span><button data-nav="how" class="text-[10px] font-bold text-[#7d9ab8] underline uppercase">HOW TO PLAY</button></div>
+      <div class="text-[10px] font-bold tracking-[0.16em] text-[#6d8ba8] uppercase mb-1.5">YOUR NAME</div>
+      <input id="pufferPlayerName" type="text" placeholder="what the ring calls you" class="w-full px-3 py-2.5 bg-[#06111e] border border-[#243d59] focus:border-[#50e0f8] focus:outline-none text-xs text-white placeholder-[#4c6985] mb-3" />
+      <div id="lobbySkinStrip" class="flex gap-2 overflow-x-auto pb-1.5"></div>
+    </div>
+    <div class="ocean-panel p-4 mb-3">
+      <button id="hostPufferRoomBtn" class="w-full py-3.5 bg-[#091829] border-2 border-[#50e0f8] hover:bg-[#102640] text-xs font-black tracking-[0.22em] text-[#eef6ff] uppercase flex items-center justify-center gap-3 mb-3"><span>▼</span><span>HOST A ROOM</span><span>▼</span></button>
+      <div class="flex items-center justify-between gap-2 text-[10px]"><button id="toggleRoomPublicBtn" class="px-2.5 py-1.5 bg-[#06111e] border border-[#243d59] text-[#50e0f8] font-bold tracking-[0.14em] uppercase">PUBLIC · LISTED</button><span id="roomPublicHint" class="text-[#6d8ba8]">anyone can join from the list</span></div>
+    </div>
+    <div class="ocean-panel p-4 mb-3">
+      <div class="text-[10px] font-bold tracking-[0.18em] text-[#6d8ba8] uppercase mb-2">JOIN BY CODE</div>
+      <form id="joinCodeForm" class="flex gap-2"><input id="joinCodeInput" type="text" maxlength="4" placeholder="K R L P" class="flex-1 px-3 py-2.5 bg-[#06111e] border border-[#243d59] focus:border-[#50e0f8] focus:outline-none text-sm font-black tracking-[0.35em] text-white uppercase placeholder-[#38536e]" /><button type="submit" class="px-6 py-2.5 bg-[#d94b76] hover:bg-[#f05c88] text-[#071422] font-black text-xs tracking-[0.18em] uppercase">JOIN</button></form>
+    </div>
+    <div class="ocean-panel p-4">
+      <div class="flex items-center justify-between mb-3"><span class="text-[10px] font-bold tracking-[0.18em] text-[#cce4f7] uppercase">PUBLIC ROOMS</span><span id="onlineStatusBadge" class="text-[10px] tracking-[0.14em] text-[#6d8ba8] uppercase">CONNECTING...</span></div>
+      <div id="publicRoomsList" class="divide-y divide-[#15283d]"></div>
+    </div>
+  </section>
+
+  <section id="viewPuffer" class="hidden relative z-10 min-h-screen w-full max-w-[494px] mx-auto px-4 pt-16 pb-6 flex flex-col justify-center">
+    <div class="ocean-panel p-5">
+      <div class="flex items-center justify-between gap-2 mb-4">
+        <div><div id="pufferRoomBadge" class="text-[10px] font-black uppercase tracking-[0.2em] text-[#50e0f8]">ROOM · KRLP</div><div class="text-[11px] text-[#8ba6c2]">Pass the puffer before it pops!</div></div>
+        <div class="flex gap-1.5 flex-wrap justify-end">
+          <button id="pufferCopyCodeBtn" class="hidden px-2.5 py-1.5 bg-[#071425] border border-[#50e0f8] text-[10px] font-bold uppercase text-[#50e0f8]">Copy Code</button>
+          <button id="pufferAddBotBtn" class="hidden px-2.5 py-1.5 bg-[#071425] border border-[#1d354f] text-[10px] font-bold uppercase text-[#cce4f7]">+ Bot</button>
+          <button id="pufferStartOnlineBtn" class="hidden px-3 py-1.5 bg-[#e64c78] text-[#071422] text-[10px] font-black uppercase">Start</button>
+          <button id="pufferRestartBtn" class="px-2.5 py-1.5 bg-[#071425] border border-[#1d354f] text-[10px] font-bold uppercase text-[#eef6ff]">Rematch</button>
+          <button id="pufferLeaveBtn" class="px-2.5 py-1.5 text-[10px] font-bold uppercase text-[#7d9ab8] hover:text-white">Lobby</button>
+        </div>
+      </div>
+      <div id="pufferPlayers" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4"></div>
+      <div class="bg-[#06111e] border-2 border-[#50e0f8]/40 p-4 mb-4 flex flex-col items-center text-center">
+        <div class="flex items-center justify-between w-full text-xs mb-2"><span id="pufferTurnLabel" class="font-bold text-[#50e0f8] uppercase">Your Turn</span><span id="pufferFuseText" class="mono font-black text-amber-300">Fuse: 12.0s</span></div>
+        <div class="w-full h-1.5 bg-[#0b1c30] overflow-hidden mb-3"><div id="pufferFuseBar" class="h-full bg-[#50e0f8] transition-all duration-75" style="width:100%"></div></div>
+        <div class="h-28 flex items-center justify-center"><img id="pufferStageSprite" alt="Puffer" class="w-24 h-24 object-contain pixel-art transition-transform duration-100" /></div>
+        <div id="pufferPromptTitle" class="text-base sm:text-lg font-bold text-white mt-1">Name a country in Africa</div>
+        <div id="pufferEventLog" class="text-[11px] text-[#8ba6c2] mt-1 min-h-[16px]"></div>
+      </div>
+      <div id="pufferUsedWrap" class="flex flex-wrap gap-1.5 mb-4 min-h-[24px]"></div>
+      <form id="pufferForm" autocomplete="off" class="flex gap-2"><input id="pufferInput" type="text" placeholder="Type a fresh answer to pass..." class="flex-1 min-w-0 px-3.5 py-3 bg-[#06111e] border-2 border-[#1d354f] focus:border-[#50e0f8] focus:outline-none text-white text-sm font-bold" /><button id="pufferSubmitBtn" type="submit" class="px-5 py-3 bg-[#e64c78] text-[#071422] font-black text-xs uppercase tracking-[0.16em] shrink-0">PASS</button></form>
+    </div>
+  </section>
+
+  <!-- Secondary Views -->
+  <section id="viewArchive" class="hidden relative z-10 min-h-screen w-full max-w-[494px] mx-auto px-4 pt-16 pb-6 flex flex-col justify-center"><div class="ocean-panel p-5"><div class="flex items-center justify-between mb-4"><h2 class="text-sm font-black uppercase tracking-[0.2em]">⟲ ARCHIVE</h2><button data-nav="home" class="text-xs font-bold uppercase text-[#50e0f8]">Back</button></div><div id="archiveGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div></div></section>
+  <section id="viewPacks" class="hidden relative z-10 min-h-screen w-full max-w-[494px] mx-auto px-4 pt-16 pb-6 flex flex-col justify-center"><div class="ocean-panel p-5"><div class="flex items-center justify-between mb-4"><div><h2 class="text-sm font-black uppercase tracking-[0.2em]">THEMED PACKS</h2><p class="text-[11px] text-[#7d9ab8] mt-0.5">Beyond the daily dive · 7 prompts each</p></div><button data-nav="home" class="text-xs font-bold uppercase text-[#50e0f8]">Back</button></div><div id="packsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div></div></section>
+  <section id="viewMyKrillion" class="hidden relative z-10 min-h-screen w-full max-w-[494px] mx-auto px-4 pt-16 pb-6 flex flex-col justify-center"><div class="ocean-panel p-5 space-y-4"><div class="flex items-center justify-between"><h2 class="text-sm font-black uppercase tracking-[0.2em]">MY KRILLION</h2><button data-nav="home" class="text-xs font-bold uppercase text-[#50e0f8]">Back</button></div><div class="grid grid-cols-3 gap-2.5"><div class="p-3 bg-[#06111e] border border-[#1d354f]"><div class="text-[9px] uppercase text-[#7d9ab8]">Best Depth</div><div id="statBestDepth" class="text-xl font-black mono text-[#50e0f8] mt-1">0m</div></div><div class="p-3 bg-[#06111e] border border-[#1d354f]"><div class="text-[9px] uppercase text-[#7d9ab8]">Dives</div><div id="statTotalDives" class="text-xl font-black mono text-white mt-1">0</div></div><div class="p-3 bg-[#06111e] border border-[#1d354f]"><div class="text-[9px] uppercase text-[#7d9ab8]">Streak</div><div id="statStreak" class="text-xl font-black mono text-[#e6557e] mt-1">1d</div></div></div><button id="openSkinsFromProfile" class="w-full py-3 bg-[#0b1c30] border border-[#50e0f8] text-xs font-bold tracking-[0.16em] text-[#50e0f8] uppercase">OPEN DIVER SKINS</button></div></section>
+  <section id="viewFriends" class="hidden relative z-10 min-h-screen w-full max-w-[494px] mx-auto px-4 pt-16 pb-6 flex flex-col justify-center"><div class="ocean-panel p-5 space-y-3 text-center"><h2 class="text-sm font-black uppercase tracking-[0.2em]">FRIENDS</h2><p class="text-xs text-[#8ba6c2]">Share your daily dive card or host a private Puffer Party room code.</p><div class="flex justify-center gap-2 pt-2"><button data-nav="pufferLobby" class="px-4 py-2 bg-[#50e0f8] text-[#071422] font-black text-xs uppercase">Puffer Party</button><button data-nav="home" class="px-4 py-2 bg-[#071425] border border-[#1d354f] text-xs font-bold uppercase">Back</button></div></div></section>
+  <section id="viewHow" class="hidden relative z-10 min-h-screen w-full max-w-[494px] mx-auto px-4 pt-16 pb-6 flex flex-col justify-center"><div class="ocean-panel p-5 space-y-4"><div class="flex items-center justify-between"><h2 class="text-sm font-black uppercase tracking-[0.2em]">HOW TO PLAY · FAQ</h2><button data-nav="home" class="text-xs font-bold uppercase text-[#50e0f8]">Close</button></div><p class="text-xs text-[#a9c3db] leading-relaxed">7 prompts · 25s each. Wrong answers bounce back (<em>"no echo. try again"</em>) so you can keep guessing. Valid answers plunge you deeper: <strong>1 pt = 10 m</strong> (max 7,000 m).</p><div class="border border-[#1d354f] bg-[#06111e]"><table class="w-full text-xs text-left"><thead class="bg-[#0b1c30] text-[#7d9ab8] uppercase text-[10px]"><tr><th class="px-3 py-2">Tier</th><th class="px-3 py-2">Pts</th><th class="px-3 py-2">Depth</th></tr></thead><tbody class="divide-y divide-[#16293f]"><tr><td class="px-3 py-2 font-bold text-[#94a3b8]">Plankton</td><td class="px-3 py-2 mono">10</td><td class="px-3 py-2 mono">100m</td></tr><tr><td class="px-3 py-2 font-bold text-[#2dd4bf]">Too Clever</td><td class="px-3 py-2 mono">15</td><td class="px-3 py-2 mono">150m</td></tr><tr><td class="px-3 py-2 font-bold text-[#50e0f8]">Schooler</td><td class="px-3 py-2 mono">30</td><td class="px-3 py-2 mono">300m</td></tr><tr><td class="px-3 py-2 font-bold text-[#e6557e]">Rare</td><td class="px-3 py-2 mono">60</td><td class="px-3 py-2 mono">600m</td></tr><tr><td class="px-3 py-2 font-bold text-[#a855f7]">Deep Cut</td><td class="px-3 py-2 mono">85</td><td class="px-3 py-2 mono">850m</td></tr><tr><td class="px-3 py-2 font-bold text-[#facc15]">One in a Krillion</td><td class="px-3 py-2 mono">100</td><td class="px-3 py-2 mono">1,000m</td></tr></tbody></table></div></div></section>
+  <section id="viewMerch" class="hidden relative z-10 min-h-screen w-full max-w-[460px] mx-auto px-4 pt-16 pb-6 flex flex-col justify-center"><div class="ocean-panel p-5 space-y-3 text-center"><h2 class="text-sm font-black uppercase tracking-[0.2em]">KRILLION SUPPLY</h2><p class="text-xs text-[#8ba6c2]">Daily Dive Club tees, sweatshirts, hoodies, and dad caps at shop.krillion.io.</p><button data-nav="home" class="mt-2 px-5 py-2 bg-[#50e0f8] text-[#071422] font-black text-xs uppercase">Back</button></div></section>
+
+    <!-- Toast -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-[#50e0f8] text-[#071422] font-black text-xs uppercase tracking-[0.12em] shadow-xl opacity-0 pointer-events-none transition-opacity duration-200"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const KRILL_SPRITE_SRC = "/sprites/krill.png";
+  const PUFFER_SPRITE_SRC = "/sprites/puffer.png";
+  const SQUID_SPRITE_SRC = "/sprites/squid.png";
+  const ANGLER_SPRITE_SRC = "/sprites/angler.png";
+  const MANTIS_SPRITE_SRC = "/sprites/mantis.png";
+  const LEVIATHAN_SPRITE_SRC = "/sprites/leviathan.png";
+
+  const SPRITE_SRCS = {
+    krill: KRILL_SPRITE_SRC,
+    puffer: PUFFER_SPRITE_SRC,
+    squid: SQUID_SPRITE_SRC,
+    angler: ANGLER_SPRITE_SRC,
+    mantis: MANTIS_SPRITE_SRC,
+    leviathan: LEVIATHAN_SPRITE_SRC
+  };
+  const SPRITE_IMGS = {};
+  Object.entries(SPRITE_SRCS).forEach(([k, src]) => { const im = new Image(); im.src = src; SPRITE_IMGS[k] = im; });
+  const krillImg = SPRITE_IMGS.krill;
+  const pufferImg = SPRITE_IMGS.puffer;
+
+  const FONT5x7 = {
+    K: ['10001','10010','10100','11000','10100','10010','10001'],
+    R: ['11110','10001','10001','11110','10100','10010','10001'],
+    I: ['111','010','010','010','010','010','111'],
+    L: ['1000','1000','1000','1000','1000','1000','1111'],
+    O: ['01110','10001','10001','10001','10001','10001','01110'],
+    N: ['10001','11001','10101','10011','10001','10001','10001'],
+    M: ['10001','11011','10101','10001','10001','10001','10001'],
+    E: ['1111','1000','1000','1110','1000','1000','1111'],
+    U: ['10001','10001','10001','10001','10001','10001','01110']
+  };
+  function renderPixelWord(word, shadowId, faceId, viewW, px = 7, gap = 11, alignLeft = false) {
+    const glyphs = word.split('').map(c => FONT5x7[c]);
+    let totalW = 0; glyphs.forEach((g, i) => { totalW += g[0].length * px + (i < glyphs.length - 1 ? gap : 0); });
+    let cx = alignLeft ? 4 : Math.floor((viewW - totalW) / 2), rects = '';
+    glyphs.forEach(g => {
+      for (let r = 0; r < g.length; r++) for (let c = 0; c < g[r].length; c++) if (g[r][c] === '1') rects += `<rect x="${cx + c * px}" y="${3 + r * px}" width="${px}" height="${px}" />`;
+      cx += g[0].length * px + gap;
+    });
+    document.getElementById(shadowId).innerHTML = rects;
+    document.getElementById(faceId).innerHTML = rects;
+  }
+
+  // Exact colors & taglines observed from live krillion.io playthrough!
+  const TIERS_BASE = {
+    miss:      { key: 'miss',      label: 'NOTHING LANDED',    pts: 0,   color: '#7e9bb8', cbColor: '#94a3b8', filter: 'grayscale(1) brightness(0.6)', flavor: 'never made it onto the reef.' },
+    plankton:  { key: 'plankton',  label: 'PLANKTON',          pts: 10,  color: '#88b4cc', cbColor: '#cbd5e1', filter: 'grayscale(0.5) brightness(1.1)', flavor: 'The answer everyone blurts out.' },
+    clever:    { key: 'clever',    label: 'TOO CLEVER',        pts: 15,  color: '#2dd4bf', cbColor: '#fde047', filter: 'hue-rotate(155deg)', flavor: 'Clever trap — half the ocean tried it.' },
+    schooler:  { key: 'schooler',  label: 'SCHOOLER',          pts: 30,  color: '#50e0f8', cbColor: '#38bdf8', filter: 'hue-rotate(190deg) saturate(1.2)', flavor: 'Solid — swims with the school.' },
+    rare:      { key: 'rare',      label: 'RARE',              pts: 60,  color: '#e6557e', cbColor: '#fb923c', filter: 'hue-rotate(-10deg) saturate(1.3)', flavor: 'Genuinely uncommon. Nice pull.' },
+    deepcut:   { key: 'deepcut',   label: 'DEEP CUT',          pts: 85,  color: '#a855f7', cbColor: '#f472b6', filter: 'hue-rotate(270deg) saturate(1.3)', flavor: 'True obscurity. Few go this deep.' },
+    krillion:  { key: 'krillion',  label: 'ONE IN A KRILLION', pts: 100, color: '#facc15', cbColor: '#fde047', filter: 'hue-rotate(42deg) saturate(1.6) brightness(1.15)', flavor: 'Pure trench legend. Almost nobody found this.' }
+  };
+  function getTierColor(t) { return settings.colorblind ? t.cbColor : t.color; }
+
+  const SKINS = [
+    { id: 'krill',       name: 'THE KRILL',        short: 'KRILL',     sprite: 'krill',     tag: 'CLASSIC',    filter: 'none' },
+    { id: 'puffer',      name: 'PUFFER DIVER',     short: 'PUFFER',    sprite: 'puffer',    tag: 'NEW SKIN',   filter: 'none' },
+    { id: 'squid',       name: 'RARE SQUID',       short: 'SQUID',     sprite: 'squid',     tag: 'NEW SKIN',   filter: 'none' },
+    { id: 'angler',      name: 'DEEP CUT ANGLER',  short: 'ANGLER',    sprite: 'angler',    tag: 'NEW SKIN',   filter: 'none' },
+    { id: 'mantis',      name: 'MANTIS SHRIMP',    short: 'MANTIS',    sprite: 'mantis',    tag: 'NEW SKIN',   filter: 'none' },
+    { id: 'leviathan',   name: 'GOLDEN LEVIATHAN', short: 'LEVIATHAN', sprite: 'leviathan', tag: 'LEGENDARY',  filter: 'none' },
+    { id: 'evil',        name: 'EVIL KRILL',       short: 'EVIL',      sprite: 'krill',     tag: 'CRIMSON',    filter: 'hue-rotate(-25deg) contrast(1.35) saturate(1.45)' },
+    { id: 'fossil',      name: 'FOSSIL KRILL',     short: 'FOSSIL',    sprite: 'krill',     tag: 'ANCIENT',    filter: 'grayscale(0.95) sepia(0.35)' },
+    { id: 'cybersquid',  name: 'NEON SQUID',       short: 'NEON SQ',   sprite: 'squid',     tag: 'BIOLUM',     filter: 'hue-rotate(120deg) saturate(1.4) brightness(1.1)' },
+    { id: 'abyssdragon', name: 'VOID LEVIATHAN',   short: 'VOID DRG',  sprite: 'leviathan', tag: 'MYTHIC',     filter: 'hue-rotate(235deg) saturate(1.35)' }
+  ];
+
+  // Exact Depth Landmarks observed on krillion.io!
+  const LANDMARKS = [
+    { depth: 332,  label: 'deepest scuba dive ever — 332m', style: 'dashed' },
+    { depth: 390,  label: 'sperm whales hunt below here', style: 'dashed' },
+    { depth: 530,  label: 'emperor penguins dive this deep', style: 'dashed' },
+    { depth: 750,  label: 'siphonophore drift zone', style: 'dashed' },
+    { depth: 1000, label: 'THE MIDNIGHT ZONE', style: 'zone' },
+    { depth: 1250, label: 'anglerfish territory', style: 'dashed' },
+    { depth: 1850, label: 'giant squid territory', style: 'dashed' },
+    { depth: 2500, label: 'the water is 2°C and utterly black', style: 'dashed' },
+    { depth: 3000, label: 'THE ABYSS', style: 'zone' },
+    { depth: 3800, label: 'the Titanic rests here — 3,800m', style: 'titanic' },
+    { depth: 5000, label: 'THE HADAL TRENCH', style: 'zone' }
+  ];
+
+  const PUBLIC_ROOMS = [
+    { code: 'RCTV', host: 'lou',         cur: 3, max: 3, status: 'IN THE LOBBY', full: true },
+    { code: 'PLFT', host: 'coral_diver', cur: 4, max: 6, status: 'PLAYING',      full: false },
+    { code: 'NETV', host: 'Jamison',     cur: 5, max: 6, status: 'PLAYING',      full: false },
+    { code: 'AHSA', host: 'lee',         cur: 2, max: 6, status: 'IN THE LOBBY', full: false },
+    { code: 'VCUT', host: 'kelp_king',   cur: 2, max: 2, status: 'PLAYING',      full: true },
+    { code: 'MXCG', host: 'manta_ray',   cur: 3, max: 6, status: 'PLAYING',      full: false },
+    { code: 'JMTX', host: 'audiii',      cur: 1, max: 3, status: 'IN THE LOBBY', full: false },
+    { code: 'HJEN', host: 'Ryan',        cur: 2, max: 6, status: 'PLAYING',      full: false },
+    { code: 'ULJN', host: 'mustard',     cur: 4, max: 6, status: 'PLAYING',      full: false },
+    { code: 'CRTY', host: 'goober',      cur: 2, max: 6, status: 'IN THE LOBBY', full: false },
+    { code: 'MCFX', host: 'ben',         cur: 2, max: 6, status: 'PLAYING',      full: false },
+    { code: 'SJXD', host: 'meow',        cur: 5, max: 6, status: 'PLAYING',      full: false }
+  ];
+
+  const PACKS = [
+    {"id": "korat", "name": "โคราช (Korat)", "accent": "#fb923c", "desc": "32 อำเภอ ที่เที่ยว ของกิน & แลนด์มาร์กเมืองย่าโม"},
+    {"id": "rajsima", "name": "โรงเรียนราชสีมาวิทยาลัย", "accent": "#f97316", "desc": "อาคาร สัญลักษณ์ สายการเรียน & ชีวิตลูกแสด-ขาว"},
+    {"id": "thailand", "name": "ประเทศไทย (Thailand)", "accent": "#38bdf8", "desc": "จังหวัด อาหาร ขนมไทย เกาะ ดอย & ประเพณีไทย"},
+
+    { id: 'animals',   name: 'Animals & Nature',    accent: '#22d3ee', desc: 'Wild creatures, marine life & flora' },
+    { id: 'geography', name: 'World Geography',     accent: '#38bdf8', desc: 'Nations, capitals, rivers & peaks' },
+    { id: 'science',   name: 'Science & Space',     accent: '#818cf8', desc: 'Elements, moons, anatomy & dinos' },
+    { id: 'culture',   name: 'Pop Culture & Media', accent: '#a855f7', desc: 'Sports, heroes, games & classics' },
+    { id: 'food',      name: 'Food & Culinary',     accent: '#e879f9', desc: 'Fruits, pasta, cheeses & spices' }
+  ];
+
+  const PROMPTS = [
+    { id: 'sp1', pack: 'culture', q: "Name a sport where you're allowed to kick the ball",
+      p: ['soccer','football','american football','rugby','futsal'],
+      c: ['kickball','australian rules football','afl','gaelic football','hacky sack'],
+      s: ['rugby union','rugby league','beach soccer','indoor soccer','canadian football','water polo'],
+      r: ['sepak takraw','footvolley','teqball','bossaball','dodgeball','gaelic'],
+      d: ['cuju','calcio storico','kemari','chinlone','footgolf','jorkyball','padbol','sipa'],
+      k: ['kronum','cycle ball','radball','jianzi','shuttlecock','ba game','shrovetide football','la soule'] },
+    { id: 'ge4', pack: 'geography', q: 'Name an island nation',
+      p: ['japan','uk','united kingdom','australia','iceland','cuba','ireland','philippines','indonesia'],
+      c: ['madagascar','new zealand','jamaica','sri lanka','taiwan','singapore'],
+      s: ['fiji','bahamas','maldives','cyprus','malta','haiti','dominican republic','barbados','bahrain'],
+      r: ['samoa','tonga','seychelles','mauritius','grenada','saint lucia','trinidad and tobago','solomon islands','papua new guinea'],
+      d: ['vanuatu','palau','kiribati','tuvalu','nauru','micronesia','marshall islands','dominica','antigua and barbuda'],
+      k: ['comoros','sao tome and principe','saint kitts and nevis','saint vincent','timor leste','east timor','cape verde'] },
+    { id: 'an1', pack: 'animals', q: 'Name a sea creature',
+      p: ['shark','whale','dolphin','octopus','fish','crab','turtle','starfish','jellyfish'],
+      c: ['narwhal','axolotl','blobfish','mantis shrimp','anglerfish','krill'],
+      s: ['seahorse','orca','stingray','lobster','squid','walrus','manatee','barracuda','eel','clownfish'],
+      r: ['dugong','coelacanth','nautilus','cuttlefish','moray eel','beluga','manta ray','sunfish','mola mola','sea cucumber'],
+      d: ['vampire squid','goblin shark','leafy seadragon','box jellyfish','chambered nautilus','oarfish','vaquita','horseshoe crab'],
+      k: ['siphonophore','yeti crab','barreleye','dumbo octopus','salp','pyrosome','sea pig','bobbit worm','tardigrade'] },
+    { id: 'fd1', pack: 'food', q: 'Name a fruit that starts with B',
+      p: ['banana','blueberry','blackberry','blood orange'],
+      c: ['boysenberry','breadfruit','blackcurrant','bergamot'],
+      s: ['bing cherry','bartlett pear','black plum','bosc pear','bitter orange'],
+      r: ['bilberry','baobab','babaco','black sapote','burmese grape','bambangan'],
+      d: ['bilimbi','bignay','biriba','barberry','bearberry','buffaloberry','bacuri','bael'],
+      k: ['bactris','batuan','binjai','bolwarra','brush cherry','burdekin plum','byrsonima'] },
+    { id: 'sc1', pack: 'science', q: 'Name a chemical element',
+      p: ['oxygen','hydrogen','carbon','gold','silver','iron','helium','nitrogen'],
+      c: ['uranium','plutonium','titanium','tungsten','mercury','krypton','neon','lithium'],
+      s: ['sodium','potassium','calcium','copper','zinc','aluminum','chlorine','argon','platinum','lead','tin'],
+      r: ['cobalt','nickel','manganese','boron','silicon','phosphorus','sulfur','bromine','iodine','barium','radon'],
+      d: ['gallium','germanium','selenium','strontium','yttrium','zirconium','niobium','molybdenum','rhodium','palladium','cadmium','antimony'],
+      k: ['ytterbium','lutetium','hafnium','tantalum','rhenium','osmium','iridium','thallium','astatine','francium','praseodymium','oganesson'] },
+    { id: 'pc3', pack: 'culture', q: 'Name a musical instrument',
+      p: ['piano','guitar','drums','violin','flute','trumpet','saxophone','cello','bass'],
+      c: ['ukulele','kazoo','theremin','bagpipes','banjo','harp','accordion'],
+      s: ['clarinet','oboe','trombone','tuba','viola','harmonica','xylophone','marimba','tambourine','bongo'],
+      r: ['bassoon','french horn','sitar','mandolin','lute','harpsichord','kalimba','ocarina','didgeridoo','piccolo'],
+      d: ['balalaika','koto','erhu','shamisen','oud','dulcimer','hurdy gurdy','concertina','glockenspiel','celesta','melodica'],
+      k: ['nyckelharpa','glass armonica','hang drum','bandoneon','zither','guzheng','mbira','charango','crwth','serpent','sackbut','shawm'] },
+    { id: 'ge1', pack: 'geography', q: 'Name a country in Africa',
+      p: ['egypt','south africa','nigeria','kenya','morocco','ghana','ethiopia'],
+      c: ['chad','djibouti','madagascar','niger','zimbabwe','rwanda'],
+      s: ['algeria','tanzania','uganda','senegal','cameroon','tunisia','libya','sudan','angola','mali'],
+      r: ['namibia','botswana','zambia','mozambique','gabon','benin','togo','malawi','liberia','sierra leone'],
+      d: ['eswatini','lesotho','burkina faso','mauritania','eritrea','gambia','burundi','guinea bissau','equatorial guinea'],
+      k: ['comoros','sao tome and principe','sao tome','cabo verde','cape verde','seychelles','mauritius'] },
+    { id: 'an2', pack: 'animals', q: 'Name a flightless bird',
+      p: ['penguin','ostrich','emu','chicken','kiwi'],
+      c: ['dodo','cassowary','platypus'],
+      s: ['rhea','emperor penguin','king penguin','turkey','peacock'],
+      r: ['kakapo','takahe','weka','moa','elephant bird','galapagos cormorant'],
+      d: ['steamer duck','inaccessible island rail','great auk','terror bird','little spotted kiwi'],
+      k: ['kagu','junin grebe','titicaca grebe','guam rail','henderson crake','auckland teal'] },
+    { id: 'an3', pack: 'animals', q: 'Name a venomous animal',
+      p: ['snake','cobra','spider','scorpion','black widow','rattlesnake','viper','bee','wasp'],
+      c: ['platypus','komodo dragon','poison dart frog','blue ringed octopus','box jellyfish'],
+      s: ['king cobra','black mamba','tarantula','brown recluse','pufferfish','stonefish','hornet','copperhead'],
+      r: ['inland taipan','cone snail','gila monster','boomslang','funnel web spider','sea snake','lionfish','centipede'],
+      d: ['slow loris','brazilian wandering spider','deathstalker','irukandji','beaded lizard','bullet ant','gaboon viper'],
+      k: ['solenodon','pitohui','short tailed shrew','bluebottle','flower urchin','marbled cone','spiny dogfish'] },
+    { id: 'an4', pack: 'animals', q: 'Name a nocturnal mammal',
+      p: ['bat','raccoon','fox','wolf','cat','hamster','mouse','rat'],
+      c: ['sugar glider','aye aye','hedgehog','possum','opossum'],
+      s: ['badger','skunk','hyena','leopard','jaguar','koala','wombat','porcupine','ferret'],
+      r: ['pangolin','tarsier','aardvark','chinchilla','kinkajou','ocelot','fennec fox','civet','red panda'],
+      d: ['bushbaby','galago','binturong','loris','slow loris','genet','bilby','quoll','bandicoot'],
+      k: ['tenrec','colugo','numbat','cuscus','potto','zorilla','fossa','cacomistle','ringtail'] },
+    { id: 'ge2', pack: 'geography', q: 'Name a capital city in Europe',
+      p: ['paris','london','rome','berlin','madrid','amsterdam','athens','vienna'],
+      c: ['reykjavik','vaduz','andorra la vella','vatican city','monaco'],
+      s: ['lisbon','dublin','brussels','prague','warsaw','budapest','stockholm','oslo','copenhagen','helsinki'],
+      r: ['bern','zagreb','belgrade','bucharest','sofia','bratislava','tallinn','riga','vilnius','kyiv'],
+      d: ['ljubljana','tirana','skopje','sarajevo','podgorica','chisinau','valletta','nicosia','luxembourg'],
+      k: ['san marino','pristina','minsk','torshavn','nuuk'] },
+    { id: 'ge3', pack: 'geography', q: 'Name a world river',
+      p: ['nile','amazon','mississippi','thames','seine','yangtze','ganges','colorado'],
+      c: ['danube','euphrates','tigris','congo','mekong','rhine'],
+      s: ['volga','yellow river','rio grande','hudson','indus','niger','zambezi','rhone','loire'],
+      r: ['orinoco','parana','brahmaputra','yukon','mackenzie','murray','st lawrence','elbe','po','tiber'],
+      d: ['irrawaddy','salween','amur','lena','yenisei','ob','limpopo','okavango','darling','fraser'],
+      k: ['chao phraya','dnieper','dniester','tagus','ebro','guadalquivir','godavari','krishna','kaveri','tocantins'] },
+    { id: 'sc2', pack: 'science', q: 'Name a moon in our solar system',
+      p: ['moon','luna','europa','titan','io','phobos','deimos'],
+      c: ['ganymede','callisto','enceladus','triton','charon'],
+      s: ['mimas','rhea','iapetus','dione','tethys','oberon','titania','miranda'],
+      r: ['ariel','umbriel','hyperion','phoebe','amalthea','proteus','nereid'],
+      d: ['larissa','puck','epimetheus','janus','pan','atlas','prometheus','pandora','himalia'],
+      k: ['methone','pallene','anthe','sycorax','setebos','despina','galatea','thalassa','naiad','styx','kerberos','hydra','nix'] },
+    { id: 'sc5', pack: 'science', q: 'Name a dinosaur',
+      p: ['t rex','tyrannosaurus','tyrannosaurus rex','triceratops','velociraptor','stegosaurus','brachiosaurus'],
+      c: ['spinosaurus','ankylosaurus','pterodactyl','brontosaurus','diplodocus'],
+      s: ['allosaurus','parasaurolophus','iguanodon','carnotaurus','dilophosaurus','giganotosaurus','apatosaurus'],
+      r: ['pachycephalosaurus','therizinosaurus','deinonychus','compsognathus','gallimimus','ceratosaurus','baryonyx','corythosaurus'],
+      d: ['kentrosaurus','styracosaurus','microraptor','oviraptor','utahraptor','argentinosaurus','edmontosaurus','maiasaura','troodon'],
+      k: ['yi qi','concavenator','kosmoceratops','nigersaurus','amargasaurus','cryolophosaurus','herrerasaurus','eoraptor','minmi','zuul'] },
+    { id: 'pc1', pack: 'culture', q: 'Name a superhero team or hero',
+      p: ['batman','superman','spiderman','spider man','iron man','avengers','justice league','thor','hulk','wonder woman'],
+      c: ['deadpool','x men','guardians of the galaxy','fantastic four','teen titans','wolverine','flash'],
+      s: ['captain america','black widow','hawkeye','aquaman','green lantern','doctor strange','black panther','ant man','scarlet witch'],
+      r: ['daredevil','punisher','moon knight','blade','ghost rider','invincible','watchmen','defenders','thunderbolts','birds of prey'],
+      d: ['doom patrol','alpha flight','runaways','new mutants','power pack','squirrel girl','blue beetle','booster gold','zatanna','constantine'],
+      k: ['great lakes avengers','nextwave','section eight','legion of super heroes','challengers of the unknown','metal men','infinity inc','excalibur'] },
+    { id: 'pc2', pack: 'culture', q: 'Name a classic video game franchise',
+      p: ['mario','super mario','minecraft','pokemon','zelda','tetris','pacman','pac man','fortnite','gta','call of duty'],
+      c: ['sonic','doom','halo','final fantasy','roblox','among us','portal'],
+      s: ['street fighter','mortal kombat','resident evil','metal gear','metroid','donkey kong','kirby','animal crossing','skyrim','elder scrolls','fallout'],
+      r: ['castlevania','mega man','chrono trigger','earthbound','star fox','f zero','silent hill','bioshock','mass effect','half life','deus ex'],
+      d: ['suikoden','breath of fire','klonoa','ape escape','jet set radio','panzer dragoon','shenmue','parasite eve','vagrant story','golden sun'],
+      k: ['chibi robo','custom robo','baten kaitos','radiant historia','ghost trick','etrian odyssey','alundra','terranigma','lufia','rhythm heaven'] },
+    { id: 'fd2', pack: 'food', q: 'Name a type of pasta',
+      p: ['spaghetti','macaroni','penne','fettuccine','lasagna','ravioli','rigatoni','linguine'],
+      c: ['farfalle','gnocchi','tortellini','rotini','fusilli','angel hair','orzo'],
+      s: ['tagliatelle','pappardelle','ziti','maccheroni','cannelloni','manicotti','bucatini','cavatappi','orecchiette'],
+      r: ['gemelli','campanelle','conchiglie','ditalini','acini di pepe','pastina','stelline','capellini','vermicelli'],
+      d: ['trofie','casarecce','radiatori','strozzapreti','paccheri','mafaldine','cavatelli','malloreddus','pici','pizzoccheri'],
+      k: ['fregola','corzetti','busiate','bigoli','scialatielli','testaroli','lorighittas','su filindeu','tajarin','anolini'] },
+    { id: 'fd4', pack: 'food', q: 'Name a type of cheese',
+      p: ['cheddar','mozzarella','parmesan','swiss','brie','gouda','feta','american','blue cheese'],
+      c: ['camembert','gruyere','gorgonzola','ricotta','provolone','pepper jack','monterey jack'],
+      s: ['manchego','havarti','muenster','colby','edam','asiago','romano','mascarpone','halloumi','paneer','cotija'],
+      r: ['roquefort','stilton','fontina','taleggio','burrata','pecorino','emmental','jarlsberg','limburger','neufchatel'],
+      d: ['comte','reblochon','raclette','morbier','epoisses','mimolette','mahon','idiazabal','kasseri','kefalotyri','caciocavallo'],
+      k: ['casu martzu','brunost','gjetost','ossau iraty','saint nectaire','beaufort','tete de moine','vacherin','banon','cabrales','valdeon'] },
+    { id: 'fd5', pack: 'food', q: 'Name a world soup or stew',
+      p: ['chicken noodle','tomato','ramen','pho','chili','miso','clam chowder','french onion','minestrone'],
+      c: ['gumbo','borscht','gazpacho','tom yum','goulash','bisque','broccoli cheddar'],
+      s: ['lentil','split pea','beef stew','wonton','hot and sour','udon','laksa','bouillabaisse','pozole','menudo'],
+      r: ['tom kha','congee','jook','sinigang','birria','cioppino','ribollita','pasta e fagioli','avgolemono','matzo ball','irish stew'],
+      d: ['caldo verde','sancocho','feijoada','cassoulet','waterzooi','cullen skink','cock a leekie','tarator','solyanka','okroshka','kharcho'],
+      k: ['zurek','flaki','harira','mulligatawny','rasam','sambar','mohinga','bun bo hue','samgyetang','sundubu jjigae','khao soi'] },
+    {"id": "kr1", "pack": "korat", "q": "บอกชื่ออำเภอในจังหวัดนครราชสีมา (โคราช)", "p": ["เมือง", "เมืองนครราชสีมา", "ปากช่อง", "พิมาย", "สีคิ้ว", "ปักธงชัย", "โชคชัย"], "c": ["วังน้ำเขียว", "ด่านขุนทด", "สูงเนิน", "โนนสูง", "บัวใหญ่"], "s": ["ครบุรี", "เสิงสาง", "จักราช", "ห้วยแถลง", "ชุมพวง", "คง", "ประทาย", "ขามทะเลสอ", "โนนไทย", "เฉลิมพระเกียรติ"], "r": ["ขามสะแกแสง", "บ้านเหลื่อม", "แก้งสนามนาง", "โนนแดง", "สีดา", "หนองบุญมาก"], "d": ["พระทองคำ", "ลำทะเมนชัย", "บัวลาย", "เทพารักษ์", "เมืองยาง"], "k": ["อำเภอเมืองยาง", "อำเภอบัวลาย", "อำเภอลำทะเมนชัย", "อำเภอเทพารักษ์", "อำเภอสีดา"]},
+    {"id": "kr2", "pack": "korat", "q": "บอกชื่อสถานที่ท่องเที่ยวหรือแลนด์มาร์กในโคราช", "p": ["ย่าโม", "อนุสาวรีย์ท้าวสุรนารี", "เขาใหญ่", "ปราสาทหินพิมาย", "สวนสัตว์โคราช"], "c": ["วัดบ้านไร่", "วัดศาลาลอย", "ประตูชุมพล", "ผาเก็บตะวัน", "ฟาร์มโชคชัย"], "s": ["เขื่อนลำตะคอง", "วังน้ำเขียว", "อุทยานแห่งชาติทับลาน", "ไทรงาม", "บุ่งตาหลั่ว", "สวนน้ำบุ่งตาหลั่ว", "วัดหลวงพ่อโต"], "r": ["ปราสาทหินพนมวัน", "ตลาดน้ำบึงหัวทะเล", "บ่อน้ำผุดบ้านท่าช้าง", "พิพิธภัณฑ์ไม้กลายเป็นหิน", "หอชมเมืองโคราช", "น้ำตกเหวสุวัต"], "d": ["เขายายเที่ยง", "ผารักษ์สลัดได", "ปรางค์กู่", "วัดพายัพ", "อ่างเก็บน้ำห้วยยาง", "บ้านปรางค์", "จุดชมวิวผาเดียวดาย"], "k": ["ปราสาทเมืองแขก", "ปราสาทโนนกู่", "ถ้ำวัวแดง", "สะพานไม้ครบุรี", "ผาชมตะวัน", "ทุ่งกังหันลมห้วยบง"]},
+    {"id": "kr3", "pack": "korat", "q": "บอกชื่ออาหารหรือของฝากขึ้นชื่อของโคราช", "p": ["ผัดหมี่โคราช", "หมี่โคราช", "ส้มตำ", "กุนเชียง", "หมูยอ", "ไก่ย่าง"], "c": ["ขนมจีนประโดก", "ส้มตำโคราช", "ข้าวเหนียวไก่ย่าง", "หมี่กรอบ", "หมูหยอง"], "s": ["แหนม", "หมูแผ่น", "หมูฝอย", "ไก่ย่างท่าช้าง", "ลาบ", "ก๋วยเตี๋ยว", "ขนมเปี๊ยะ"], "r": ["หมี่ตะคุ", "ข้าวโพดหวานปากช่อง", "น้อยหน่าปากช่อง", "ผัดหมี่พิมาย", "น้ำพริกหมูโคราช", "หมูทุบ"], "d": ["คั่วหมี่", "ขนมจีนน้ำยาประโดก", "ข้าวคั่วโคราช", "ขนมจีนบ้านประโดก", "ปลาดุกร้า", "เมี่ยงคำโคราช"], "k": ["ขนมจีนน้ำยาไก่บ้านประโดก", "กระยาสารทโคราช", "หมูแดดเดียวปักธงชัย", "ผ้าไหมปักธงชัย", "เครื่องปั้นดินเผาด่านเกวียน"]},
+    {"id": "kr4", "pack": "korat", "q": "บอกชื่อห้าง ตลาด หรือแหล่งช้อปปิ้งในโคราช", "p": ["เดอะมอลล์", "เดอะมอลล์โคราช", "เทอร์มินอล", "เทอร์มินอล 21", "เซ็นทรัล", "เซ็นทรัลโคราช", "เซฟวัน", "ตลาดเซฟวัน"], "c": ["คลังพลาซ่า", "บิ๊กซี", "โลตัส", "แม็คโคร", "ตลาดไนท์บ้านเกาะ"], "s": ["ตลาดแม่กิมเฮง", "ไนท์บ้านเกาะ", "ไนท์บาซาร์", "ตลาดย่าโม", "โฮมโปร", "ตลาดประปา"], "r": ["ตลาดสุรนารี", "ตลาดเทิดไท", "ตลาดหัวรถไฟ", "ตลาดนัดเมย์แฟร์", "เมย์แฟร์", "ตลาด 100 ปี"], "d": ["คลังวิลล่า", "ตลาดน้ำบึงหัวทะเล", "ตลาดสระครก", "ตลาดหนองไผ่ล้อม", "ตลาดโคกกรวด", "ตลาดประตูน้ำ"], "k": ["ตลาดร้อยปีเสิงสาง", "ตลาดเก่าวังน้ำเขียว", "ตลาดโรงเกลือโคราช", "กาดน้ำบึงหัวทะเล", "ตลาดไนท์วัดบูรพ์"]},
+    {"id": "kr5", "pack": "korat", "q": "บอกชื่อมหาวิทยาลัยหรือวิทยาลัยในโคราช", "p": ["มทส", "มหาวิทยาลัยเทคโนโลยีสุรนารี", "ราชภัฏ", "ราชภัฏโคราช", "มรภ นครราชสีมา", "มทร", "มทร อีสาน"], "c": ["วงษ์ชวลิตกุล", "มหาวิทยาลัยวงษ์ชวลิตกุล", "เทคนิคโคราช", "วิทยาลัยเทคนิค"], "s": ["อาชีวะ", "วิทยาลัยอาชีวศึกษา", "วิทยาลัยพยาบาล", "วิทยาลัยเทคนิคนครราชสีมา", "วิทยาลัยสารพัดช่าง"], "r": ["วิทยาลัยนาฏศิลป", "วิทยาลัยเกษตร", "วิทยาลัยพละ", "มหาวิทยาลัยการกีฬาแห่งชาติ", "วิทยาลัยเทคโนโลยีพณิชยการ"], "d": ["วิทยาลัยเทคนิคหลวงพ่อคูณ", "วิทยาลัยการอาชีพปากช่อง", "วิทยาลัยการอาชีพพิมาย", "วิทยาลัยการอาชีพชุมพวง"], "k": ["วิทยาลัยชุมชนนครราชสีมา", "วิทยาลัยเทคนิคสุรนารี", "วิทยาลัยการอาชีพบัวใหญ่", "สถาบันบัณฑิตพัฒนศิลป์โคราช"]},
+    {"id": "kr6", "pack": "korat", "q": "บอกชื่อถนนหรือแยกสำคัญในตัวเมืองโคราช", "p": ["มิตรภาพ", "ถนนมิตรภาพ", "ราชดำเนิน", "ถนนราชดำเนิน", "จอมพล", "สุรนารี"], "c": ["30 กันยา", "ถนน 30 กันยา", "ช้างเผือก", "โพธิ์กลาง", "แยกปักธงชัย"], "s": ["ชุมพล", "มุขมนตรี", "อัษฎางค์", "สืบศิริ", "แยกบิ๊กซี", "แยกหัวทะเล", "ถนน 304"], "r": ["แยกพีกาซัส", "แยกประโดก", "แยกจอหอ", "ถนนมหาดไทย", "ถนนจักรี", "ถนนมนัส", "ถนนบัวรอง"], "d": ["ถนนกำแหงสงคราม", "ถนนยมราช", "ถนนสรรพสิทธิ์", "ถนนกีฬากลาง", "ถนนเลียบคลองชลประทาน", "แยกไอที"], "k": ["ถนนพลแสน", "ถนนวัชรสฤษดิ์", "ถนนประจักษ์", "ถนนจอมสุรางค์ยาตร์", "แยกวัดศาลาลอย", "แยกอัมพวัน"]},
+    {"id": "kr7", "pack": "korat", "q": "บอกชื่อโรงเรียนมัธยมในโคราช", "p": ["ราชสีมาวิทยาลัย", "ราชสีมา", "สุรนารีวิทยา", "สุรนารี", "บุญวัฒนา", "อัสสัมชัญ", "มารีย์วิทยา"], "c": ["ราชสีมาวิทยาลัย 2", "สุรนารีวิทยา 2", "อุบลรัตนราชกัญญา", "สุรธรรมพิทักษ์", "เมืองนครราชสีมา"], "s": ["ปลูกปัญญา", "แองโกลสิงคโปร์", "พิมายวิทยา", "ปากช่อง", "โชคชัยสามัคคี", "ปักธงชัยประชานิรมิต"], "r": ["ขามทะเลสอวิทยา", "สีคิ้วสวัสดิ์ผดุงวิทยา", "ด่านขุนทด", "โนนสูงศรีธานี", "บัวใหญ่", "ครบุรี", "สูงเนิน"], "d": ["มหิศราธิบดี", "เตรียมอุดมศึกษาน้อมเกล้า นครราชสีมา", "สุรนารีวิทยา 2", "ห้วยแถลงพิทยาคม", "คงทองวิทยา", "ประทาย"], "k": ["เสิงสาง", "จักราชวิทยา", "ชุมพวงศึกษา", "หนองบุญมากประสงค์วิทยา", "บ้านเหลื่อมพิทยาสรรพ์", "แก้งสนามนางพิทยาคม"]},
+    {"id": "rs1", "pack": "rajsima", "q": "บอกชื่ออาคารหรือสถานที่ภายในโรงเรียนราชสีมาวิทยาลัย", "p": ["โรงอาหาร", "สนามฟุตบอล", "หอประชุม", "อาคาร 1", "เสาธง", "ห้องสมุด"], "c": ["โดม", "อาคาร 2", "อาคาร 3", "อาคาร 4", "อาคาร 5", "อาคาร 6", "สระว่ายน้ำ"], "s": ["อาคาร 7", "อาคารวิทยาศาสตร์", "สนามบาส", "ห้องพยาบาล", "ห้องปกครอง", "สหกรณ์", "ลานหน้าเสาธง"], "r": ["อาคารสิริสีมาพัฒน์", "หอประชุม 113 ปี", "อาคาร 111 ปี", "ธรรมสถาน", "อาคารธรรมสถาน", "เรือนเกษตร", "โรงยิม"], "d": ["บ้านคุณย่า", "ห้องน้ำเทพประคอง", "อาคารพุธ ฐานิโย", "ห้องเกียรติยศ", "หอพระ", "ลานทองกวาว"], "k": ["อาคารธรรมสถานพระภาวนาพิศาลเถระ", "เสาธง 37 เมตร", "ห้องปฏิบัติการดาราศาสตร์", "ศาลาแสดขาว"]},
+    {"id": "rs2", "pack": "rajsima", "q": "บอกสัญลักษณ์ สี คติพจน์ หรือสิ่งประจำโรงเรียนราชสีมาวิทยาลัย", "p": ["แสดขาว", "สีแสดขาว", "สีแสด", "สีขาว", "รส", "r.s.", "rs"], "c": ["มานะ วินัย", "มานะ", "วินัย", "ทองกวาว", "ต้นทองกวาว"], "s": ["ดอกจาน", "ดอกทองกวาว", "ลูกแสดขาว", "ราชสีห์", "เสมา", "ตราโรงเรียน"], "r": ["พระพุทธราชสีมามงคลชัย", "เสาธง 37 เมตร", "วัดกลาง", "วัดพระนารายณ์มหาราช", "มาร์ชราชสีมา"], "d": ["เสมาธรรมจักร", "พระประธาน 59 นิ้ว", "สิงห์แสดขาว", "คำขวัญมานะวินัย"], "k": ["butea monosperma", "พุทธาภิเษก 2530", "เกียรติศักดิ์แสดขาว", "เสาธงใหญ่ที่สุดในโคราช"]},
+    {"id": "rs3", "pack": "rajsima", "q": "บอกชื่อสายการเรียนหรือห้องเรียนพิเศษในโรงเรียนราชสีมาวิทยาลัย", "p": ["วิทย์คณิต", "ศิลป์คำนวณ", "ศิลป์ภาษา", "ep", "english program"], "c": ["กิฟเต็ด", "gifted", "smte", "ห้องพิเศษ", "ห้องพิเศษวิทย์"], "s": ["ศิลป์จีน", "ศิลป์ญี่ปุ่น", "ศิลป์ฝรั่งเศส", "วิทย์คอม", "ห้องเรียนพิเศษคณิต", "ห้องเรียนปกติ"], "r": ["สอวน", "ศูนย์ สอวน", "วิทยาศาสตร์พลังสิบ", "วิทย์พลังสิบ", "ห้องเรียนกีฬา", "ศิลป์เกาหลี"], "d": ["พสวท", "ห้องเรียนพิเศษวิทย์คณิต", "ห้องเรียนมาตรฐานสากล", "world class standard", "วิทย์วิศวะ"], "k": ["ห้องเรียนพิเศษวิทยาศาสตร์ คณิตศาสตร์ เทคโนโลยีและสิ่งแวดล้อม", "โครงการพัฒนาอัจฉริยภาพ", "สอวน คณิตศาสตร์"]},
+    {"id": "rs4", "pack": "rajsima", "q": "บอกชื่อกิจกรรม ชมรม หรือกีฬาเด่นของโรงเรียนราชสีมาวิทยาลัย", "p": ["กีฬาสี", "ฟุตบอล", "บาสเกตบอล", "วงโยธวาทิต", "วงโย", "ลูกเสือ"], "c": ["รด", "รักษาดินแดน", "วอลเลย์บอล", "แบดมินตัน", "ปิงปอง", "สภานักเรียน"], "s": ["ดนตรีสากล", "ดนตรีไทย", "วันวิทยาศาสตร์", "วันไหว้ครู", "กีฬาสีแสดขาว", "กรีฑา", "ฟุตซอล"], "r": ["โยธวาทิตโลก", "แปรอักษร", "เชียร์ลีดเดอร์", "หุ่นยนต์", "อีสปอร์ต", "ค่าย สอวน", "วิ่งแสดขาว"], "d": ["รักบี้", "ว่ายน้ำ", "เทควันโด", "ชมรมถ่ายภาพ", "ชมรมดาราศาสตร์", "บวงสรวงย่าโม", "พิธีประดับเข็ม"], "k": ["ประกวดวงโยธวาทิตโลก", "ค่ายวิทยาศาสตร์พลังสิบ", "วันต้นไม้ประจำปี", "แข่งหุ่นยนต์ สพฐ"]},
+    {"id": "rs5", "pack": "rajsima", "q": "บอกชื่อวิชาที่เรียนในโรงเรียนราชสีมาวิทยาลัย", "p": ["คณิตศาสตร์", "คณิต", "ภาษาไทย", "ไทย", "ภาษาอังกฤษ", "อังกฤษ", "วิทยาศาสตร์", "วิทย์", "พละ", "สังคม"], "c": ["ฟิสิกส์", "เคมี", "ชีววิทยา", "ชีวะ", "คอมพิวเตอร์", "ประวัติศาสตร์"], "s": ["ศิลปะ", "ดนตรี", "สุขศึกษา", "การงาน", "การงานอาชีพ", "แนะแนว", "หน้าที่พลเมือง"], "r": ["ดาราศาสตร์", "วิทยาการคำนวณ", "ภาษาจีน", "ภาษาญี่ปุ่น", "โครงงาน", "โลกและอวกาศ", "เศรษฐศาสตร์"], "d": ["สถิติ", "แคลคูลัส", "ภาษาฝรั่งเศส", "นาฏศิลป์", "พระพุทธศาสนา", "ลูกเสือเนตรนารี", "เทคโนโลยี"], "k": ["คณิตศาสตร์เพิ่มเติม", "ฟิสิกส์เพิ่มเติม", "เคมีวิเคราะห์", "การเขียนโปรแกรม", "ภูมิศาสตร์กายภาพ"]},
+    {"id": "rs6", "pack": "rajsima", "q": "บอกชื่อสถานที่หรือจุดนัดพบแถวโรงเรียนราชสีมาวิทยาลัย", "p": ["เซเว่น", "7-11", "หน้าโรงเรียน", "เซฟวัน", "ตลาดเซฟวัน", "เดอะมอลล์"], "c": ["สะพานลอย", "ป้ายรถเมล์", "ปั๊ม ปตท", "โลตัส", "บิ๊กซี", "ร้านน้ำหน้าโรงเรียน"], "s": ["ถนนมิตรภาพ", "โคกกรวด", "มทส", "ตลาดเทิดไท", "โฮมโปร", "บ้านใหม่", "ประตูน้ำ"], "r": ["แยกปักธงชัย", "อ่างห้วยยาง", "วัดบ้านใหม่", "ศาลปกครอง", "สนามกีฬา 80 พรรษา", "ตลาดโคกกรวด"], "d": ["สวนสัตว์โคราช", "ปั๊มบางจาก", "หมู่บ้านสุรนารีวิลล์", "ซอยสามยอด", "สามยอด", "ตลาดสามยอด"], "k": ["ทางคู่ขนานมิตรภาพ", "สะพานลอยราชสีมา", "วัดใหม่สระประทุม", "อ่างเก็บน้ำห้วยยาง"]},
+    {"id": "rs7", "pack": "rajsima", "q": "บอกสิ่งของที่นักเรียนราชสีมาวิทยาลัยต้องพกไปโรงเรียน", "p": ["กระเป๋า", "ปากกา", "สมุด", "มือถือ", "โทรศัพท์", "เงิน", "บัตรนักเรียน"], "c": ["ดินสอ", "ยางลบ", "ไม้บรรทัด", "ลิควิด", "หนังสือ", "หนังสือเรียน"], "s": ["ขวดน้ำ", "เข็มขัด", "รองเท้า", "ถุงเท้า", "เสื้อพละ", "หูฟัง", "พาวเวอร์แบงค์"], "r": ["ไอแพด", "แท็บเล็ต", "เครื่องคิดเลข", "แฟ้ม", "ตารางสอน", "ร่ม", "แว่นตา", "กุญแจรถ"], "d": ["ปากกาไฮไลท์", "กระเป๋าดินสอ", "สมุดบันทึกความดี", "หมวกกันน็อก", "เสื้อกันหนาว", "ทิชชู่"], "k": ["วงเวียน", "ครึ่งวงกลม", "ไม้ที", "ตารางธาตุ", "สมุดพก", "เข็มกลัด รส"]},
+    {"id": "th1", "pack": "thailand", "q": "บอกชื่อจังหวัดในประเทศไทย", "p": ["กรุงเทพ", "กรุงเทพมหานคร", "เชียงใหม่", "ภูเก็ต", "นครราชสีมา", "โคราช", "ชลบุรี", "ขอนแก่น"], "c": ["เชียงราย", "อยุธยา", "พระนครศรีอยุธยา", "สงขลา", "อุดรธานี", "สุราษฎร์ธานี", "กระบี่"], "s": ["ระยอง", "กาญจนบุรี", "นครปฐม", "นนทบุรี", "ปทุมธานี", "สมุทรปราการ", "บุรีรัมย์", "สุรินทร์", "อุบลราชธานี", "พิษณุโลก", "นครสวรรค์"], "r": ["น่าน", "เลย", "ตรัง", "พังงา", "ประจวบคีรีขันธ์", "เพชรบุรี", "จันทบุรี", "ตราด", "ลำปาง", "แพร่", "สุโขทัย", "ร้อยเอ็ด", "ศรีสะเกษ"], "d": ["บึงกาฬ", "อำนาจเจริญ", "มุกดาหาร", "หนองบัวลำภู", "อุทัยธานี", "สิงห์บุรี", "อ่างทอง", "ระนอง", "สตูล", "แม่ฮ่องสอน", "ยโสธร", "พะเยา"], "k": ["สมุทรสงคราม", "นครนายก", "ชัยนาท", "พิจิตร", "พัทลุง", "ปัตตานี", "ยะลา", "นราธิวาส", "สระแก้ว", "หนองคาย"]},
+    {"id": "th2", "pack": "thailand", "q": "บอกชื่ออาหารไทยยอดนิยม", "p": ["ผัดไทย", "ต้มยำกุ้ง", "ส้มตำ", "กะเพรา", "ผัดกะเพรา", "ข้าวมันไก่", "ข้าวผัด"], "c": ["แกงเขียวหวาน", "มัสมั่น", "หมูกระทะ", "ก๋วยเตี๋ยวเรือ", "ข้าวซอย", "พะแนง"], "s": ["ลาบ", "น้ำตก", "ต้มข่าไก่", "ยำวุ้นเส้น", "ไข่เจียว", "หมูปิ้ง", "แกงส้ม", "ทอดมัน", "ข้าวขาหมู", "ผัดซีอิ๊ว"], "r": ["ห่อหมก", "ขนมจีนน้ำยา", "แกงเทโพ", "ยำปลาดุกฟู", "ไก่ทอดหาดใหญ่", "คอหมูย่าง", "ต้มแซ่บ", "ข้าวคลุกกะปิ", "ผัดพริกแกง"], "d": ["แกงฮังเล", "คั่วกลิ้ง", "แกงไตปลา", "น้ำพริกอ่อง", "น้ำพริกหนุ่ม", "ผัดสะตอ", "แกงเลียง", "หมูชะมวง", "ข้าวแช่"], "k": ["หลนเต้าเจี้ยว", "แสร้งว่า", "แกงรัญจวน", "ม้าฮ่อ", "หมูโสร่ง", "แกงคั่วหอยขม", "น้ำพริกลงเรือ", "ขนมจีนซาวน้ำ"]},
+    {"id": "th3", "pack": "thailand", "q": "บอกชื่อขนมไทย", "p": ["ข้าวเหนียวมะม่วง", "ทองหยิบ", "ทองหยอด", "ฝอยทอง", "ลอดช่อง", "บัวลอย"], "c": ["ขนมชั้น", "ขนมครก", "ขนมเบื้อง", "ทับทิมกรอบ", "สังขยา", "ข้าวต้มมัด"], "s": ["กล้วยบวชชี", "เม็ดขนุน", "ลูกชุบ", "วุ้นกะทิ", "ขนมตาล", "ขนมกล้วย", "ตะโก้", "ขนมหม้อแกง", "ข้าวหลาม", "ขนมถ้วย"], "r": ["ขนมต้ม", "ขนมเทียน", "ขนมใส่ไส้", "อาลัว", "ขนมผิง", "ขนมเปียกปูน", "ข้าวเหนียวสังขยา", "ครองแครง", "ถั่วแปบ"], "d": ["จ่ามงกุฎ", "เสน่ห์จันทร์", "ทองเอก", "ขนมลืมกลืน", "ปลากริมไข่เต่า", "ข้าวเม่าทอด", "ขนมเรไร", "ขนมดอกจอก"], "k": ["บุหลันดั้นเมฆ", "สัมปันนี", "ดาราทอง", "ช่อม่วง", "ขนมพระพาย", "ขนมเกสรลำเจียก", "ขนมบุหลัน", "ขนมหินฝนทอง"]},
+    {"id": "th4", "pack": "thailand", "q": "บอกชื่อเกาะหรือทะเลในประเทศไทย", "p": ["ภูเก็ต", "เกาะสมุย", "สมุย", "เกาะล้าน", "พัทยา", "หัวหิน", "เกาะพีพี"], "c": ["เกาะช้าง", "เกาะเสม็ด", "เกาะพะงัน", "เกาะเต่า", "บางแสน", "ชะอำ"], "s": ["เกาะหลีเป๊ะ", "เกาะสิมิลัน", "เกาะกูด", "เกาะสีชัง", "เกาะลันตา", "อ่าวมาหยา", "ทะเลแหวก"], "r": ["เกาะสุรินทร์", "เกาะห้อง", "เกาะหมาก", "เกาะพยาม", "เกาะนางยวน", "เกาะแสมสาร", "เกาะขาม", "หาดใหญ่"], "d": ["เกาะมุก", "เกาะกระดาน", "เกาะรอก", "เกาะตะรุเตา", "เกาะตาชัย", "เกาะไม้ท่อน", "เกาะราชา", "เกาะยาวน้อย"], "k": ["เกาะพระทอง", "เกาะอาดัง", "เกาะราวี", "เกาะลิบง", "เกาะสุกร", "เกาะมันนอก", "เกาะจาน", "เกาะทะลุ"]},
+    {"id": "th5", "pack": "thailand", "q": "บอกชื่อแม่น้ำหรือภูเขา/ดอยในประเทศไทย", "p": ["เจ้าพระยา", "แม่น้ำเจ้าพระยา", "ดอยอินทนนท์", "แม่น้ำโขง", "แม่น้ำปิง", "ภูกระดึง"], "c": ["ดอยสุเทพ", "เขาใหญ่", "ภูทับเบิก", "แม่น้ำมูล", "แม่น้ำชี", "แม่น้ำน่าน"], "s": ["แม่น้ำวัง", "แม่น้ำยม", "แม่น้ำแคว", "แม่น้ำบางปะกง", "แม่น้ำท่าจีน", "แม่น้ำแม่กลอง", "ดอยอ่างขาง", "ภูชี้ฟ้า"], "r": ["ดอยหลวงเชียงดาว", "ดอยผ้าห่มปก", "ดอยเสมอดาว", "ภูเรือ", "แม่น้ำป่าสัก", "แม่น้ำตาปี", "เขาค้อ", "ดอยแม่สลอง"], "d": ["ภูสอยดาว", "เขาหลวง", "เขาคิชฌกูฏ", "แม่น้ำสะแกกรัง", "แม่น้ำเพชรบุรี", "แม่น้ำปัตตานี", "ดอยช้าง", "ภูบักได"], "k": ["โมโกจู", "ยอดเขาโมโกจู", "ดอยปุย", "แม่น้ำสงคราม", "แม่น้ำโก-ลก", "เขาสก", "ภูผาม่าน", "ดอยม่อนจอง"]},
+    {"id": "th6", "pack": "thailand", "q": "บอกชื่อเทศกาลหรือวันสำคัญของไทย", "p": ["สงกรานต์", "วันสงกรานต์", "ลอยกระทง", "วันลอยกระทง", "ปีใหม่", "วันแม่", "วันพ่อ", "วันเด็ก"], "c": ["วันเข้าพรรษา", "วันออกพรรษา", "มาฆบูชา", "วิสาขบูชา", "อาสาฬหบูชา", "วันครู", "วันไหว้ครู"], "s": ["บุญบั้งไฟ", "ผีตาโขน", "แห่เทียนพรรษา", "กินเจ", "เทศกาลกินเจ", "ยี่เป็ง", "วันจักรี", "วันปิยมหาราช"], "r": ["สารทเดือนสิบ", "ชักพระ", "ไหลเรือไฟ", "ตักบาตรเทโว", "วันพืชมงคล", "วันรัฐธรรมนูญ", "วันแรงงาน"], "d": ["ปอยส่างลอง", "รับบัว", "อุ้มพระดำน้ำ", "สลากภัต", "วิ่งควาย", "บุญคูณลาน", "วันสุนทรภู่"], "k": ["ประเพณีตานก๋วยสลาก", "บุญผะเหวด", "แห่นางแมว", "ประเพณีชิงเปรต", "ลอยเรือชาวเล", "เทศกาลโคมแสนดวง"]},
+    {"id": "th7", "pack": "thailand", "q": "บอกชื่อผลไม้ในประเทศไทย", "p": ["ทุเรียน", "มะม่วง", "มังคุด", "เงาะ", "แตงโม", "กล้วย", "ส้ม", "มะพร้าว"], "c": ["ลำไย", "ลิ้นจี่", "สับปะรด", "มะละกอ", "ฝรั่ง", "ขนุน", "ชมพู่"], "s": ["น้อยหน่า", "ส้มโอ", "ลองกอง", "ลางสาด", "กระท้อน", "สละ", "ระกำ", "พุทรา", "ทับทิม", "แก้วมังกร", "เสาวรส"], "r": ["มะยงชิด", "มะปราง", "มะเฟือง", "มะไฟ", "มะขาม", "มะขามเทศ", "น้อยโหน่ง", "ลูกตาล", "มะยม"], "d": ["ลูกหว้า", "ตะขบ", "มะขามป้อม", "มะดัน", "มะกอกน้ำ", "จำปาดะ", "อินทผลัม", "มะตูม"], "k": ["หมากเม่า", "ลูกเนียง", "มะมุด", "กระจับ", "ลูกหยี", "มะพูด", "มะหาด", "ลูกชิด", "ตะลิงปลิง"]}
+  ];
+
+  // =========================================================================
+  // FUZZY MATCHING
+  // =========================================================================
+  function normalizeText(str) {
+    return (str || '').toLowerCase().normalize('NFC')
+      .replace(/[^a-z0-9\u0E00-\u0E7F\s]/g, ' ').replace(/\b(the|a|an)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function levenshtein(a, b) {
+    if (a === b) return 0;
+    const m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    const dp = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+      let prev = dp[0]; dp[0] = i;
+      for (let j = 1; j <= n; j++) {
+        const tmp = dp[j];
+        dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+        prev = tmp;
+      }
+    }
+    return dp[n];
+  }
+  function titleCase(str) { return str.replace(/\b\w/g, c => c.toUpperCase()); }
+  function evaluateAnswer(prompt, rawInput) {
+    const clean = normalizeText(rawInput);
+    if (!clean || clean.length < 2) return { matched: false, corrected: false, tier: TIERS_BASE.miss, canonical: rawInput.trim() || '(Blank)' };
+    const order = [['krillion', prompt.k], ['deepcut', prompt.d], ['rare', prompt.r], ['schooler', prompt.s], ['clever', prompt.c], ['plankton', prompt.p]];
+    for (const [k, list] of order) {
+      for (const item of list) {
+        const ni = normalizeText(item);
+        const cNoSp = clean.replace(/\s+/g, ''), niNoSp = ni.replace(/\s+/g, '');
+        if (clean === ni || cNoSp === niNoSp || clean === ni + 's' || clean + 's' === ni || clean === ni + 'es') {
+          return { matched: true, corrected: false, tier: TIERS_BASE[k], canonical: titleCase(item) };
+        }
+      }
+    }
+    let best = null;
+    for (const [k, list] of order) {
+      for (const item of list) {
+        const ni = normalizeText(item);
+        const maxD = ni.length >= 8 ? 2 : (ni.length >= 4 ? 1 : 0);
+        if (!maxD) continue;
+        const d = levenshtein(clean, ni);
+        if (d <= maxD && (!best || d < best.d)) best = { d, tier: TIERS_BASE[k], canonical: titleCase(item) };
+      }
+    }
+    if (best) return { matched: true, corrected: true, tier: best.tier, canonical: best.canonical };
+    return { matched: false, corrected: false, tier: TIERS_BASE.miss, canonical: rawInput.trim() };
+  }
+  function seededShuffle(arr, seed) {
+    const copy = arr.slice(); let s = seed >>> 0;
+    for (let i = copy.length - 1; i > 0; i--) {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      const j = s % (i + 1);
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+  function getDivePromptsForNumber(diveNum) {
+    if (diveNum === 132) return PROMPTS.slice(0, 7);
+    return seededShuffle(PROMPTS, diveNum * 31337).slice(0, 7);
+  }
+
+  // =========================================================================
+  // WARM AQUATIC WEB AUDIO ENGINE (Plunge Whoosh + Rarity Chords)
+  // =========================================================================
+  class AquaticAudioEngine {
+    constructor() {
+      this.ctx = null; this.muted = false; this.noiseBuf = null;
+      this.reverbNode = null; this.ambientNodes = null;
+      this.lastCue = new Map();
+    }
+    unlock() {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+        this.ctx = new AC();
+        this.comp = this.ctx.createDynamicsCompressor();
+        this.comp.threshold.value = -16; this.comp.knee.value = 20; this.comp.ratio.value = 5;
+        this.master = this.ctx.createGain(); this.master.gain.value = this.muted ? 0 : 0.9;
+        this.sfxBus = this.ctx.createGain(); this.sfxBus.gain.value = 0.88;
+        this.ambBus = this.ctx.createGain(); this.ambBus.gain.value = settings.ambience ? 0.28 : 0.0001;
+
+        // Procedural Underwater Convolver Reverb (warm 1.4s ocean chamber tail)
+        const irLen = Math.floor(this.ctx.sampleRate * 1.4);
+        const irBuf = this.ctx.createBuffer(2, irLen, this.ctx.sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+          const data = irBuf.getChannelData(ch);
+          let lp = 0;
+          for (let i = 0; i < irLen; i++) {
+            const decay = Math.pow(1 - i / irLen, 2.6);
+            lp = lp * 0.72 + (Math.random() * 2 - 1) * 0.28;
+            data[i] = lp * decay;
+          }
+        }
+        this.reverbNode = this.ctx.createConvolver();
+        this.reverbNode.buffer = irBuf;
+        this.reverbGain = this.ctx.createGain();
+        this.reverbGain.gain.value = 0.34;
+
+        this.sfxBus.connect(this.comp);
+        this.sfxBus.connect(this.reverbNode);
+        this.reverbNode.connect(this.reverbGain);
+        this.reverbGain.connect(this.comp);
+        this.ambBus.connect(this.comp);
+        this.comp.connect(this.master);
+        this.master.connect(this.ctx.destination);
+
+        // Pre-bake rich brown/pink water noise buffer (2.5s)
+        const len = Math.floor(this.ctx.sampleRate * 2.5);
+        this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const d = this.noiseBuf.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0, br = 0;
+        for (let i = 0; i < len; i++) {
+          const w = Math.random() * 2 - 1;
+          b0 = 0.997 * b0 + w * 0.029; b1 = 0.985 * b1 + w * 0.032; b2 = 0.95 * b2 + w * 0.048;
+          br = (br + 0.02 * w) / 1.02;
+          d[i] = (b0 + b1 + b2 + br * 2.4) * 1.45;
+        }
+        this.startAmbientOcean();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+    }
+
+    startAmbientOcean() {
+      if (!this.ctx || !this.noiseBuf || this.ambientNodes) return;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noiseBuf; src.loop = true;
+      const lpf = this.ctx.createBiquadFilter();
+      lpf.type = 'lowpass'; lpf.frequency.value = 210; lpf.Q.value = 0.8;
+      // Gentle LFO modulating ocean wave swell
+      const lfo = this.ctx.createOscillator();
+      const lfoG = this.ctx.createGain();
+      lfo.type = 'sine'; lfo.frequency.value = 0.14; lfoG.gain.value = 75;
+      lfo.connect(lfoG).connect(lpf.frequency);
+
+      // Deep warm hydrophone sub-pad (C2 + G2)
+      const pad1 = this.ctx.createOscillator(), pad2 = this.ctx.createOscillator(), padG = this.ctx.createGain();
+      pad1.type = 'sine'; pad1.frequency.value = 65.41;
+      pad2.type = 'sine'; pad2.frequency.value = 98.00;
+      padG.gain.value = 0.06;
+
+      src.connect(lpf).connect(this.ambBus);
+      pad1.connect(padG); pad2.connect(padG); padG.connect(this.ambBus);
+      src.start(); lfo.start(); pad1.start(); pad2.start();
+      this.ambientNodes = { src, lpf, lfo, pad1, pad2 };
+    }
+
+    updateDepthAmbience(depthMeters) {
+      if (!this.ambientNodes || !this.ctx) return;
+      const targetFreq = Math.max(95, 230 - (depthMeters / 5000) * 125);
+      this.ambientNodes.lpf.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.35);
+      const ambLevel = settings.ambience && !this.muted ? 0.30 : 0.0001;
+      this.ambBus.gain.setTargetAtTime(ambLevel, this.ctx.currentTime, 0.2);
+    }
+
+    speakCallout(phrase) {
+      if (this.muted || !settings.ambience || typeof window.speechSynthesis === 'undefined') return;
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(phrase);
+        u.rate = 1.08; u.pitch = 0.94; u.volume = 0.55; u.lang = 'en-US';
+        window.speechSynthesis.speak(u);
+      } catch (_) {}
+    }
+
+    setMuted(m) {
+      this.muted = m;
+      if (this.master && this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.02);
+      if (m && typeof window.speechSynthesis !== 'undefined') try { window.speechSynthesis.cancel(); } catch (_) {}
+    }
+    canPlay(id, cd = 35) { if (this.muted || !this.ctx) return false; const now = performance.now(); if (now - (this.lastCue.get(id) || 0) < cd) return false; this.lastCue.set(id, now); return true; }
+    jitter(v, p = 0.07) { return v * (1 + (Math.random() * 2 - 1) * p); }
+
+    // Warm plucked acoustic string (Karplus-Strong physical modeling for organic non-robotic chimes!)
+    playPluck(freq, startTime, vol = 0.18, dur = 0.55) {
+      if (!this.ctx) return;
+      const sr = this.ctx.sampleRate;
+      const period = Math.max(12, Math.round(sr / freq));
+      const len = Math.floor(sr * dur);
+      const buf = this.ctx.createBuffer(1, len, sr);
+      const out = buf.getChannelData(0);
+      for (let i = 0; i < period; i++) out[i] = (Math.random() * 2 - 1) * 0.7;
+      for (let i = period; i < len; i++) out[i] = 0.496 * (out[i - period] + out[i - period + 1]);
+      const src = this.ctx.createBufferSource(); src.buffer = buf;
+      const lpf = this.ctx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 1800;
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(vol, startTime); g.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+      src.connect(lpf).connect(g).connect(this.sfxBus);
+      src.start(startTime);
+    }
+
+    playGateCross(stepIdx = 0) {
+      if (!this.canPlay('gate_' + stepIdx, 70)) return;
+      const scale = [392.00, 440.00, 523.25, 587.33, 659.25, 783.99];
+      const f = scale[Math.min(scale.length - 1, stepIdx)];
+      const t = this.ctx.currentTime;
+      this.playPluck(this.jitter(f, 0.015), t, 0.16, 0.42);
+      this.playBubble(f * 1.15);
+    }
+    playBubble(pitch = 480) {
+      if (!this.canPlay('bubble', 35)) return;
+      const t = this.ctx.currentTime, o = this.ctx.createOscillator(), l = this.ctx.createBiquadFilter(), g = this.ctx.createGain();
+      o.type = 'sine'; const f0 = this.jitter(pitch, 0.09);
+      o.frequency.setValueAtTime(f0 * 0.72, t); o.frequency.exponentialRampToValueAtTime(f0 * 1.42, t + 0.06);
+      l.type = 'lowpass'; l.frequency.value = 1350;
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.14, t + 0.007); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+      o.connect(l).connect(g).connect(this.sfxBus); o.start(t); o.stop(t + 0.09);
+    }
+
+    playPlungeWhoosh(durationSec = 1.4) {
+      if (!this.canPlay('plunge', 120) || !this.noiseBuf) return;
+      const t = this.ctx.currentTime, n = this.ctx.createBufferSource(); n.buffer = this.noiseBuf; n.loop = true;
+      const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.3;
+      f.frequency.setValueAtTime(740, t); f.frequency.exponentialRampToValueAtTime(145, t + durationSec);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(0.34, t + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + durationSec);
+      n.connect(f).connect(g).connect(this.sfxBus); n.start(t); n.stop(t + durationSec + 0.06);
+      // Bubbling cascade during plunge
+      for (let i = 0; i < 6; i++) {
+        setTimeout(() => this.playBubble(320 + i * 55), i * Math.min(170, (durationSec * 800) / 6));
+      }
+    }
+
+    // SKILL 1: Deep-sea Submarine Sonar Ping with lush reverb tail
+    playSkillSonar() {
+      if (!this.canPlay('sonar', 120)) return;
+      const t = this.ctx.currentTime;
+      [1174.66, 1760].forEach((freq, idx) => {
+        const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(this.jitter(freq, 0.01), t);
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(idx === 0 ? 0.24 : 0.07, t + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
+        o.connect(g).connect(this.sfxBus); o.start(t); o.stop(t + 1.2);
+      });
+    }
+
+    // SKILL 2: Crystalline Oxygen Freeze shimmer
+    playSkillFreeze() {
+      if (!this.canPlay('freeze', 120)) return;
+      const t = this.ctx.currentTime;
+      [1046.5, 1318.5, 1567.98, 2093.0].forEach((f, i) => this.playPluck(f, t + i * 0.045, 0.14, 0.7));
+      if (this.noiseBuf) {
+        const n = this.ctx.createBufferSource(); n.buffer = this.noiseBuf;
+        const hp = this.ctx.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.setValueAtTime(2400, t); hp.Q.value = 3;
+        const g = this.ctx.createGain(); g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(0.14, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+        n.connect(hp).connect(g).connect(this.sfxBus); n.start(t, 0.2, 0.48);
+      }
+    }
+
+    // SKILL 3: Abyssal Boost deep turbine power-up
+    playSkillBoost() {
+      if (!this.canPlay('boost', 120)) return;
+      const t = this.ctx.currentTime;
+      const sub = this.ctx.createOscillator(), sg = this.ctx.createGain();
+      sub.type = 'sine'; sub.frequency.setValueAtTime(62, t); sub.frequency.exponentialRampToValueAtTime(148, t + 0.42);
+      sg.gain.setValueAtTime(0.001, t); sg.gain.linearRampToValueAtTime(0.36, t + 0.05); sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      sub.connect(sg).connect(this.sfxBus); sub.start(t); sub.stop(t + 0.58);
+      [440, 554.37, 659.25, 880].forEach((f, i) => this.playPluck(f, t + i * 0.05, 0.16, 0.6));
+    }
+
+    // SKILL 4: Current Reroll swirling water vortex
+    playSkillReroll() {
+      if (!this.canPlay('reroll', 120) || !this.noiseBuf) return;
+      const t = this.ctx.currentTime;
+      const n = this.ctx.createBufferSource(); n.buffer = this.noiseBuf;
+      const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2.4;
+      f.frequency.setValueAtTime(240, t); f.frequency.exponentialRampToValueAtTime(1100, t + 0.25); f.frequency.exponentialRampToValueAtTime(280, t + 0.55);
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(0.28, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+      n.connect(f).connect(g).connect(this.sfxBus); n.start(t, 0.1, 0.62);
+    }
+
+    playNoEcho() {
+      if (!this.canPlay('noecho', 90)) return;
+      const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = 'triangle'; o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(145, t + 0.15);
+      g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(0.16, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+      o.connect(g).connect(this.sfxBus); o.start(t); o.stop(t + 0.2);
+    }
+    playTick(urgent = false) {
+      if (!this.canPlay('tick', 240)) return;
+      const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = 'triangle'; o.frequency.setValueAtTime(urgent ? 480 : 350, t); o.frequency.exponentialRampToValueAtTime(155, t + 0.04);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(urgent ? 0.14 : 0.08, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
+      o.connect(g).connect(this.sfxBus); o.start(t); o.stop(t + 0.06);
+    }
+    playTierReward(tierKey) {
+      if (!this.canPlay('tier', 80)) return;
+      const t = this.ctx.currentTime;
+      const sub = this.ctx.createOscillator(), sg = this.ctx.createGain();
+      sub.type = 'sine'; sub.frequency.setValueAtTime(tierKey === 'krillion' ? 142 : 118, t); sub.frequency.exponentialRampToValueAtTime(38, t + 0.30);
+      sg.gain.setValueAtTime(0.0001, t); sg.gain.linearRampToValueAtTime(tierKey === 'krillion' ? 0.40 : 0.24, t + 0.01); sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+      sub.connect(sg).connect(this.sfxBus); sub.start(t); sub.stop(t + 0.36);
+
+      // Warm Karplus-Strong underwater harp chords (zero robotic synth buzz!)
+      const chords = {
+        miss:     [196, 174.61],
+        plankton: [261.63, 329.63],
+        clever:   [293.66, 311.13],
+        schooler: [329.63, 392.00, 493.88],
+        rare:     [329.63, 440.00, 523.25, 659.25],
+        deepcut:  [349.23, 440.00, 523.25, 659.25, 783.99],
+        krillion: [329.63, 440.00, 523.25, 659.25, 783.99, 1046.5]
+      };
+      (chords[tierKey] || chords.plankton).forEach((freq, idx) => {
+        this.playPluck(this.jitter(freq, 0.008), t + idx * 0.065, tierKey === 'krillion' ? 0.20 : 0.16, 0.75);
+      });
+      if (tierKey === 'rare') this.speakCallout('Rare!');
+      else if (tierKey === 'deepcut') this.speakCallout('Deep Cut!');
+      else if (tierKey === 'krillion') this.speakCallout('One in a Krillion!');
+    }
+    playPufferPop() {
+      if (!this.canPlay('pop', 100)) return;
+      const t = this.ctx.currentTime, sub = this.ctx.createOscillator(), sg = this.ctx.createGain();
+      sub.type = 'sine'; sub.frequency.setValueAtTime(190, t); sub.frequency.exponentialRampToValueAtTime(34, t + 0.18);
+      sg.gain.setValueAtTime(0.001, t); sg.gain.linearRampToValueAtTime(0.5, t + 0.006); sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.21);
+      sub.connect(sg).connect(this.sfxBus); sub.start(t); sub.stop(t + 0.23);
+    }
+  }
+  const audio = new AquaticAudioEngine();
+
+  // =========================================================================
+  // REAL-TIME PLUNGE WORLD ENGINE (Camera plunges through real world-space depth!)
+  // =========================================================================
+  const canvas = document.getElementById('sceneCanvas');
+  const ctx = canvas.getContext('2d');
+  const settings = { lowPower: false, colorblind: false, corrections: true, clearRejected: false, shareLink: false, ambience: true };
+
+  // World scale: 1 meter = 1.45 pixels vertically! So sinking 600m scrolls 870px visibly!
+  const PX_PER_METER = 1.45;
+
+  const scene = {
+    w: window.innerWidth, h: window.innerHeight, dpr: Math.min(window.devicePixelRatio || 1, 2),
+    waterlineRatio: 0.641, targetWaterlineRatio: 0.641,
+    cameraDepth: 0,
+    targetDepth: 0,
+    plungeSpeed: 0,
+    displayScore: 0,
+    targetScore: 0,
+    lastTierMark: null,
+    // Timed buttery-smooth plunge animation state (exact match to 1000066673.mp4!)
+    plungeAnim: null,    // { startDepth, endDepth, startTime, duration, capsuleText, gates: [...] }
+    time: 0, trauma: 0, flashAlpha: 0, flashColor: '#50e0f8',
+    krillVisible: false,
+    krillX: 0.72, krillY: 0.44, targetKrillX: 0.16, targetKrillY: 0.56,
+    krillScaleX: 1, krillScaleY: 1, krillTilt: 0,
+    // World-space fish & marine snow
+    fish: Array.from({ length: 14 }, (_, i) => ({
+      x: Math.random(), worldDepth: 80 + i * 240 + Math.random() * 120,
+      spd: (Math.random() < 0.5 ? -1 : 1) * (0.016 + Math.random() * 0.022), sz: 9 + Math.random() * 6
+    })),
+    snow: Array.from({ length: 65 }, () => ({ x: Math.random(), y: Math.random(), r: 1 + Math.random() * 2.2, ph: Math.random() * 6.28 })),
+    centerBubbles: Array.from({ length: 28 }, () => ({ x: 0.5 + (Math.random() - 0.5) * 0.24, y: Math.random(), r: 2 + Math.random() * 4, spd: 0.14 + Math.random() * 0.18 })),
+    particles: Array.from({ length: 130 }, () => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, r: 2, life: 0, maxLife: 1, color: '#50e0f8', kind: 'spark' })),
+    rings: Array.from({ length: 8 }, () => ({ active: false, x: 0, y: 0, r: 10, maxR: 120, life: 0, maxLife: 0.55, color: '#50e0f8' }))
+  };
+
+  function resizeCanvas() {
+    scene.w = window.innerWidth; scene.h = window.innerHeight;
+    scene.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(scene.w * scene.dpr);
+    canvas.height = Math.floor(scene.h * scene.dpr);
+    ctx.setTransform(scene.dpr, 0, 0, scene.dpr, 0, 0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  function drawPixelCloud(cx, cy, scale, alpha = 0.92) {
+    const p = Math.max(3, Math.round(scale));
+    const blocks = [[-5,1,11,1],[-7,2,15,1],[-8,3,17,1],[-6,0,8,1],[-4,-1,5,1],[1,0,4,1]];
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#c8dfec';
+    blocks.forEach(([bx,by,bw,bh]) => ctx.fillRect(Math.round(cx + bx*p), Math.round(cy + (by+0.5)*p), bw*p, bh*p));
+    ctx.fillStyle = '#f5fafd';
+    blocks.forEach(([bx,by,bw,bh]) => ctx.fillRect(Math.round(cx + bx*p), Math.round(cy + by*p), bw*p, bh*p));
+    ctx.restore();
+  }
+
+  function drawPixelBoat(bx, waterY) {
+    const p = 3; ctx.save();
+    ctx.fillStyle = '#152230';
+    ctx.fillRect(bx - 7*p, waterY - 2*p, 15*p, 2*p);
+    ctx.fillRect(bx - 5*p, waterY - 3*p, 11*p, p);
+    ctx.fillRect(bx - 2*p, waterY - 5*p, 5*p, 2*p);
+    ctx.fillRect(bx, waterY - 10*p, p, 5*p);
+    ctx.fillStyle = '#b92b43';
+    ctx.fillRect(bx - 4*p, waterY - 10*p, 4*p, 2*p);
+    ctx.fillRect(bx - 5*p, waterY - 9*p, p, p);
+    ctx.restore();
+  }
+
+  // Scrolling Rocky Canyon Walls + Bioluminescent Abyss Vents (Visible motion as cameraDepth increases!)
+  function drawTrenchWalls(contentLeft, contentW, waterY) {
+    const step = 36;
+    const worldScrollPx = scene.cameraDepth * PX_PER_METER;
+    const startRow = Math.floor(worldScrollPx / step) - 2;
+    const rows = Math.ceil(scene.h / step) + 4;
+    const inAbyss = scene.cameraDepth > 2600;
+
+    ctx.save();
+    for (let r = startRow; r < startRow + rows; r++) {
+      if (r < 2) continue;
+      const sy = Math.round(r * step - worldScrollPx + Math.max(0, waterY));
+      if (sy < waterY || sy > scene.h + step) continue;
+      // Deterministic jagged rock overhang width from row index
+      const lw = 18 + Math.round((Math.sin(r * 0.73) * 0.5 + 0.5) * 26 + (Math.cos(r * 1.9) * 0.5 + 0.5) * 14);
+      const rw = 18 + Math.round((Math.cos(r * 0.61) * 0.5 + 0.5) * 24 + (Math.sin(r * 2.1) * 0.5 + 0.5) * 14);
+      ctx.fillStyle = inAbyss ? '#0c081a' : '#081829';
+      ctx.fillRect(contentLeft, sy, lw, step + 1);
+      ctx.fillRect(contentLeft + contentW - rw, sy, rw, step + 1);
+
+      // Subtle rock rim highlight or bioluminescent purple/pink node in Abyss
+      if (inAbyss && r % 5 === 0) {
+        ctx.fillStyle = r % 10 === 0 ? 'rgba(230, 85, 126, 0.55)' : 'rgba(168, 85, 247, 0.55)';
+        ctx.fillRect(contentLeft + lw - 4, sy + 12, 5, 5);
+        ctx.fillRect(contentLeft + contentW - rw - 1, sy + 20, 5, 5);
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawKelpFrond(baseX, bottomY, height, phase, side) {
+    ctx.save(); ctx.fillStyle = 'rgba(13, 38, 58, 0.75)';
+    const segs = 12, segH = height / segs;
+    for (let i = 0; i < segs; i++) {
+      const t = i / segs, sway = Math.sin(scene.time * 1.4 + phase + t * 2.8) * (9 * t);
+      const sx = baseX + sway, sy = bottomY - i * segH;
+      ctx.fillRect(Math.round(sx - 2), Math.round(sy - segH), 4, Math.ceil(segH) + 1);
+      if (i > 1 && i < segs - 1) {
+        const ld = (i % 2 === 0 ? 1 : -1) * side, ll = Math.round((11 + Math.sin(i * 1.3) * 4) * (1 - t * 0.3));
+        ctx.fillRect(Math.round(sx + (ld > 0 ? 2 : -ll - 2)), Math.round(sy - segH * 0.6), ll, 4);
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawFish(x, y, sz, dir) {
+    ctx.save(); ctx.fillStyle = 'rgba(7, 20, 34, 0.68)';
+    ctx.translate(Math.round(x), Math.round(y)); ctx.scale(dir, 1);
+    ctx.fillRect(-sz, -sz * 0.35, sz * 1.6, sz * 0.7);
+    ctx.fillRect(-sz * 0.6, -sz * 0.55, sz * 0.9, sz * 1.1);
+    ctx.fillRect(-sz * 1.5, -sz * 0.5, sz * 0.5, sz);
+    ctx.restore();
+  }
+
+  function spawnParticle(x, y, vx, vy, r, life, color, kind = 'spark') {
+    if (settings.lowPower && Math.random() < 0.5) return;
+    for (let i = 0; i < scene.particles.length; i++) {
+      const pt = scene.particles[i];
+      if (!pt.active) { pt.active = true; pt.x = x; pt.y = y; pt.vx = vx; pt.vy = vy; pt.r = r; pt.life = life; pt.maxLife = life; pt.color = color; pt.kind = kind; return; }
+    }
+  }
+  function spawnRing(x, y, maxR, color) {
+    for (let i = 0; i < scene.rings.length; i++) {
+      const rg = scene.rings[i];
+      if (!rg.active) { rg.active = true; rg.x = x; rg.y = y; rg.r = 12; rg.maxR = maxR; rg.life = 0.58; rg.maxLife = 0.58; rg.color = color; return; }
+    }
+  }
+  function burstTierFireworks(tier) {
+    const cx = scene.w * 0.5, cy = scene.h * 0.44, col = getTierColor(tier);
+    spawnRing(cx, cy, tier.pts >= 85 ? 190 : 120, col);
+    if (tier.pts === 100) spawnRing(cx, cy, 260, '#50e0f8');
+    const n = tier.pts >= 85 ? 48 : (tier.pts >= 60 ? 30 : 16);
+    for (let i = 0; i < n; i++) {
+      const a = (Math.PI * 2 * i) / n + (Math.random() - 0.5) * 0.35;
+      const spd = 70 + Math.random() * (tier.pts >= 85 ? 220 : 130);
+      spawnParticle(cx, cy, Math.cos(a) * spd, Math.sin(a) * spd, 2.5 + Math.random() * 3, 0.65 + Math.random() * 0.5, col, 'spark');
+    }
+  }
+
+  function lerpColor(a, b, t) {
+    const c = Math.max(0, Math.min(1, t));
+    return `rgb(${Math.round(((a>>16)&255) + (((b>>16)&255)-((a>>16)&255))*c)},${Math.round(((a>>8)&255) + (((b>>8)&255)-((a>>8)&255))*c)},${Math.round((a&255) + ((b&255)-(a&255))*c)})`;
+  }
+
+  let lastFrame = performance.now();
+  function renderScene(now) {
+    const dt = Math.min(0.05, (now - lastFrame) / 1000);
+    lastFrame = now;
+    scene.time += dt;
+
+    scene.waterlineRatio += (scene.targetWaterlineRatio - scene.waterlineRatio) * Math.min(1, dt * 3.6);
+
+    // Buttery-smooth cubic ease-in-out plunge with live tier-gate crossing bursts (1000066673.mp4!)
+    const prevDepth = scene.cameraDepth;
+    if (scene.plungeAnim) {
+      const pa = scene.plungeAnim;
+      const u = Math.min(1, (now - pa.startTime) / pa.duration);
+      // Smooth cubic ease-in-out with gentle brake at the end
+      const ease = u < 0.35
+        ? 4 * u * u * u / (4 * 0.35 * 0.35 * 0.35) * 0.25
+        : 0.25 + 0.75 * (1 - Math.pow(1 - (u - 0.35) / 0.65, 3));
+      scene.cameraDepth = pa.startDepth + (pa.endDepth - pa.startDepth) * Math.min(1, ease);
+
+      // Fire crisp spark burst + rising chime as Krill crosses each relative tier gate!
+      const contentW0 = Math.min(scene.w, 494);
+      const contentLeft0 = (scene.w - contentW0) / 2;
+      const kxNow = contentLeft0 + contentW0 * scene.krillX;
+      const kyNow = scene.h * 0.52;
+      pa.gates.forEach((g, gIdx) => {
+        if (!g.crossed && scene.cameraDepth >= g.depth - 4) {
+          g.crossed = true;
+          audio.playGateCross(gIdx);
+          if (!settings.lowPower) {
+            scene.trauma = Math.min(0.65, scene.trauma + 0.14);
+            for (let k = 0; k < 16; k++) {
+              const ang = Math.random() * Math.PI * 2;
+              const spd = 45 + Math.random() * 140;
+              spawnParticle(kxNow, kyNow, Math.cos(ang) * spd, Math.sin(ang) * spd - 20, 2.5 + Math.random() * 2.5, 0.55 + Math.random() * 0.35, g.color, 'spark');
+            }
+          }
+        }
+      });
+      if (u >= 1) {
+        scene.cameraDepth = pa.endDepth;
+        scene.plungeAnim = null;
+      }
+    } else {
+      const diff = scene.targetDepth - scene.cameraDepth;
+      if (Math.abs(diff) > 0.4) scene.cameraDepth += diff * Math.min(1, dt * 4.2);
+      else scene.cameraDepth = scene.targetDepth;
+    }
+    scene.plungeSpeed = Math.abs(scene.cameraDepth - prevDepth) / Math.max(0.001, dt);
+    audio.updateDepthAmbience(scene.cameraDepth);
+
+    // Smoothly roll HUD DEPTH & SCORE during the plunge!
+    if (game.view === 'play') {
+      const dShow = Math.round(scene.cameraDepth);
+      $('hudDepthMeters').textContent = dShow === 0 ? '0m' : `-${dShow.toLocaleString()}m`;
+      if (Math.abs(scene.targetScore - scene.displayScore) > 0.2) {
+        scene.displayScore += (scene.targetScore - scene.displayScore) * Math.min(1, dt * 4.5);
+        $('hudScoreVal').textContent = String(Math.round(scene.displayScore));
+      } else {
+        scene.displayScore = scene.targetScore;
+        $('hudScoreVal').textContent = String(Math.round(scene.displayScore));
+      }
+    }
+
+    scene.krillX += (scene.targetKrillX - scene.krillX) * Math.min(1, dt * 3.5);
+    scene.krillY += (scene.targetKrillY - scene.krillY) * Math.min(1, dt * 3.5);
+
+    scene.trauma = Math.max(0, scene.trauma - 1.5 * dt);
+    let shakeX = 0, shakeY = 0;
+    if (scene.trauma > 0.001 && !settings.lowPower) {
+      const s = scene.trauma * scene.trauma, st = scene.time * 32;
+      shakeX = 10 * s * (Math.sin(st * 1.7) * 0.65 + Math.sin(st * 3.1) * 0.35);
+      shakeY = 7 * s * (Math.cos(st * 2.3) * 0.65 + Math.sin(st * 4.1) * 0.35);
+    }
+
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    // Real world-space waterline moves smoothly off-screen as cameraDepth increases!
+    const baseWaterY = Math.round(scene.h * scene.waterlineRatio);
+    const waterY = Math.round(baseWaterY - scene.cameraDepth * PX_PER_METER);
+    const contentW = Math.min(scene.w, 494);
+    const contentLeft = (scene.w - contentW) / 2;
+
+    // 1. SKY (Visible at surface & during initial descent)
+    if (waterY > 0) {
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, waterY);
+      skyGrad.addColorStop(0.00, '#5ca5c5'); skyGrad.addColorStop(0.24, '#66adcd');
+      skyGrad.addColorStop(0.50, '#72bad9'); skyGrad.addColorStop(0.76, '#a8d3e4');
+      skyGrad.addColorStop(0.90, '#c5d7e3'); skyGrad.addColorStop(0.97, '#7b8790');
+      skyGrad.addColorStop(1.00, '#546069');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(-20, -20, scene.w + 40, waterY + 24);
+
+      const sunX = contentLeft + contentW * 0.84, sunY = waterY * 0.69;
+      const aura = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 64);
+      aura.addColorStop(0, 'rgba(248,224,132,0.72)'); aura.addColorStop(0.45, 'rgba(248,224,132,0.25)'); aura.addColorStop(1, 'rgba(248,224,132,0)');
+      ctx.fillStyle = aura; ctx.beginPath(); ctx.arc(sunX, sunY, 64, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f3d982';
+      for (let py = -22; py <= 22; py += 4) { const hw = Math.floor(Math.sqrt(484 - py*py)/4)*4; ctx.fillRect(Math.round(sunX - hw), Math.round(sunY + py), hw*2, 4); }
+
+      const drift = settings.lowPower ? 0 : Math.sin(scene.time * 0.18) * 8;
+      drawPixelCloud(contentLeft + contentW * 0.26 + drift * 0.6, waterY * 0.34, 8.2, 0.94);
+      drawPixelCloud(contentLeft + contentW * 0.80 - drift * 0.4, waterY * 0.37, 5.2, 0.9);
+      drawPixelCloud(contentLeft + contentW * 0.26 + drift,       waterY * 0.72, 9.5, 0.92);
+      drawPixelCloud(contentLeft + contentW * 0.63 - drift * 0.5, waterY * 0.72, 5.2, 0.88);
+      drawPixelCloud(contentLeft + contentW * 0.46 + drift * 0.7, waterY * 0.81, 6.0, 0.85);
+      drawPixelCloud(contentLeft + contentW * 0.03 + drift * 0.3, waterY * 0.81, 5.5, 0.82);
+      drawPixelCloud(contentLeft + contentW * 0.94 - drift * 0.3, waterY * 0.82, 5.0, 0.82);
+      drawPixelBoat(Math.round(contentLeft + contentW * 0.30), Math.round(waterY + Math.sin(scene.time * 2.1) * 1.2));
+    }
+
+    // 2. DEEP OCEAN GRADIENT (Darkens authentically from sunlit blue -> pitch black -> deep abyssal violet)
+    const oceanTopY = Math.max(-20, waterY);
+    const d = scene.cameraDepth;
+    let oTop = '#091929', oBot = '#07111b';
+    if (game.view !== 'home') {
+      if (d < 1200) {
+        const u = d / 1200;
+        oTop = lerpColor(0x163d5b, 0x071324, u);
+        oBot = lerpColor(0x091c30, 0x040914, u);
+      } else if (d < 2500) {
+        const u = (d - 1200) / 1300;
+        oTop = lerpColor(0x071324, 0x06040e, u);
+        oBot = lerpColor(0x040914, 0x030208, u);
+      } else {
+        const u = Math.min(1, (d - 2500) / 2500);
+        oTop = lerpColor(0x06040e, 0x13051f, u);
+        oBot = lerpColor(0x030208, 0x07020f, u);
+      }
+    }
+    const ocGrad = ctx.createLinearGradient(0, oceanTopY, 0, scene.h);
+    ocGrad.addColorStop(0, oTop); ocGrad.addColorStop(1, oBot);
+    ctx.fillStyle = ocGrad;
+    ctx.fillRect(-20, oceanTopY, scene.w + 40, scene.h - oceanTopY + 40);
+
+    // Subtle center spotlight in deep dark water (>1,200m, exact detail from live playthrough!)
+    if (game.view === 'play' && d > 1100) {
+      const sp = ctx.createRadialGradient(scene.w * 0.5, scene.h * 0.45, 20, scene.w * 0.5, scene.h * 0.45, 240);
+      sp.addColorStop(0, 'rgba(80, 224, 248, 0.05)'); sp.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = sp; ctx.fillRect(0, 0, scene.w, scene.h);
+    }
+
+    // 3. SCROLLING UNDERWATER WORLD (Canyon Walls, Landmarks, Kelp, Fish, Marine Snow, Fast Bubble Stream!)
+    if (game.view !== 'home') {
+      drawTrenchWalls(contentLeft, contentW, waterY);
+
+      // Shallow kelp near surface (0m..500m) scrolling up as you sink!
+      const kelpBaseY = Math.round(scene.h * 0.96 - scene.cameraDepth * PX_PER_METER * 0.7);
+      if (kelpBaseY > -200 && !settings.lowPower) {
+        drawKelpFrond(contentLeft + 34, kelpBaseY, 260, 0.0, 1);
+        drawKelpFrond(contentLeft + 58, kelpBaseY + 20, 190, 1.4, 1);
+        drawKelpFrond(contentLeft + contentW - 34, kelpBaseY, 240, 2.2, -1);
+      }
+
+      // World-space fish swimming at real depths (rush upward as you plunge!)
+      scene.fish.forEach(f => {
+        if (!settings.lowPower) { f.x += f.spd * dt; if (f.x < -0.1) f.x = 1.1; if (f.x > 1.1) f.x = -0.1; }
+        const fy = Math.round(scene.h * 0.52 + (f.worldDepth - scene.cameraDepth) * PX_PER_METER);
+        if (fy > waterY + 18 && fy < scene.h + 30) drawFish(contentLeft + f.x * contentW, fy, f.sz, f.spd > 0 ? 1 : -1);
+      });
+
+      // Exact Real-Site Depth Landmarks (anglerfish territory, giant squid, 2°C black, THE ABYSS, Titanic -3,800m!)
+      LANDMARKS.forEach(lm => {
+        const ly = Math.round(scene.h * 0.52 + (lm.depth - scene.cameraDepth) * PX_PER_METER);
+        if (ly < -80 || ly > scene.h + 80) return;
+        ctx.save();
+        if (lm.style === 'titanic') {
+          const tx = contentLeft + contentW * 0.5;
+          ctx.fillStyle = 'rgba(18, 30, 48, 0.78)';
+          ctx.beginPath(); ctx.moveTo(tx - 130, ly + 18); ctx.lineTo(tx - 108, ly - 10); ctx.lineTo(tx + 108, ly - 10); ctx.lineTo(tx + 135, ly + 18); ctx.closePath(); ctx.fill();
+          for (let f = -60; f <= 45; f += 35) ctx.fillRect(tx + f, ly - 34, 11, 24);
+          ctx.fillStyle = 'rgba(148, 195, 226, 0.72)'; ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'center';
+          ctx.fillText(lm.label, tx, ly + 34);
+        } else if (lm.style === 'zone') {
+          ctx.strokeStyle = 'rgba(230, 85, 126, 0.38)'; ctx.setLineDash([5, 5]);
+          ctx.beginPath(); ctx.moveTo(contentLeft + 24, ly); ctx.lineTo(contentLeft + contentW - 54, ly); ctx.stroke();
+          ctx.fillStyle = 'rgba(230, 85, 126, 0.85)'; ctx.font = '900 12px ui-monospace, monospace'; ctx.textAlign = 'left';
+          ctx.fillText(lm.label, contentLeft + 26, ly - 6);
+        } else {
+          ctx.strokeStyle = 'rgba(120, 165, 200, 0.25)'; ctx.setLineDash([4, 6]);
+          ctx.beginPath(); ctx.moveTo(contentLeft + 24, ly); ctx.lineTo(contentLeft + contentW - 54, ly); ctx.stroke();
+          ctx.fillStyle = 'rgba(130, 175, 205, 0.65)'; ctx.font = 'bold 10px ui-monospace, monospace'; ctx.textAlign = 'left';
+          ctx.fillText(lm.label, contentLeft + 26, ly - 5);
+        }
+        ctx.restore();
+      });
+
+      // Marine snow rushing upward proportionally to plungeSpeed!
+      if (!settings.lowPower) {
+        const snowBoost = 0.018 + scene.plungeSpeed * 0.0022;
+        ctx.fillStyle = 'rgba(220, 242, 255, 0.34)';
+        scene.snow.forEach(s => {
+          s.y -= snowBoost * dt;
+          if (s.y < 0) { s.y = 1; s.x = Math.random(); }
+          const sy = s.y * scene.h;
+          if (sy > waterY + 6) ctx.fillRect(Math.round(contentLeft + s.x * contentW), Math.round(sy), Math.ceil(s.r), Math.ceil(s.r + Math.min(8, scene.plungeSpeed * 0.015)));
+        });
+
+        // Central rapid bubble column (Exact signature visual during plunge!)
+        const isPlunging = scene.plungeSpeed > 40;
+        ctx.strokeStyle = isPlunging ? 'rgba(130, 228, 255, 0.62)' : 'rgba(130, 215, 245, 0.32)';
+        ctx.lineWidth = 1.3;
+        scene.centerBubbles.forEach(b => {
+          b.y -= (b.spd + scene.plungeSpeed * 0.0038) * dt;
+          if (b.y < 0) { b.y = 1.02; b.x = 0.5 + (Math.random() - 0.5) * (isPlunging ? 0.28 : 0.65); }
+          const by = b.y * scene.h;
+          if (by > waterY + 8) { ctx.beginPath(); ctx.arc(contentLeft + b.x * contentW, by, b.r, 0, Math.PI * 2); ctx.stroke(); }
+        });
+      }
+    }
+
+    // 4. REAL-TIME SCROLLING RIGHT-SIDE DEPTH RULER + PINK "YOU ◀" POINTER (Exact match to live site!)
+    const rulerX = contentLeft + contentW - 8;
+    const centerScreenY = game.view === 'home' ? Math.max(24, waterY + 12) : scene.h * 0.52;
+    ctx.save();
+    ctx.fillStyle = 'rgba(148, 195, 226, 0.32)';
+    ctx.font = 'bold 9px ui-monospace, monospace';
+    ctx.textAlign = 'right';
+    const minTickM = Math.max(0, Math.floor((scene.cameraDepth - 500) / 20) * 20);
+    const maxTickM = minTickM + 1000;
+    for (let m = minTickM; m <= maxTickM; m += 20) {
+      const ty = Math.round(centerScreenY + (m - scene.cameraDepth) * PX_PER_METER);
+      if (ty < Math.max(12, waterY) || ty > scene.h - 10) continue;
+      const isMajor = m % 100 === 0;
+      ctx.fillRect(rulerX - (isMajor ? 10 : 5), ty, isMajor ? 10 : 5, 1);
+      if (isMajor) ctx.fillText(m === 0 ? '0m' : `-${m}m`, rulerX - 13, ty + 3);
+    }
+
+    // Draw live relative Tier Gate Lines (PLANKTON · 10, TOO CLEVER · 15, SCHOOLER · 30, RARE · 60, DEEP CUT · 85, KRILLION · 100)
+    if (game.view === 'play' && scene.plungeAnim) {
+      scene.plungeAnim.gates.forEach(g => {
+        const gy = Math.round(centerScreenY + (g.depth - scene.cameraDepth) * PX_PER_METER);
+        if (gy < 55 || gy > scene.h - 45) return;
+        ctx.save();
+        ctx.strokeStyle = g.crossed ? g.color : 'rgba(130, 175, 205, 0.28)';
+        ctx.globalAlpha = g.crossed ? 0.65 : 0.42;
+        ctx.setLineDash([4, 5]);
+        ctx.beginPath(); ctx.moveTo(contentLeft + 22, gy); ctx.lineTo(rulerX - 18, gy); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = g.crossed ? g.color : 'rgba(130, 175, 205, 0.62)';
+        ctx.font = 'bold 9px ui-monospace, monospace'; ctx.textAlign = 'right';
+        ctx.fillText(`${g.label} · ${g.pts}`, rulerX - 48, gy - 4);
+        ctx.restore();
+      });
+
+      // Draw wobbling sinking answer capsule ("SEPAK TAKRAW" ▼) right in the ocean stream (1000066673.mp4 00:27-00:30, 00:40-00:42!)
+      const pa = scene.plungeAnim;
+      const capX = contentLeft + contentW * 0.47;
+      const capY = scene.h * 0.54 + Math.sin(scene.time * 5.2) * 5;
+      const capRot = Math.sin(scene.time * 3.4) * 0.065;
+      ctx.save();
+      ctx.translate(capX, capY);
+      ctx.rotate(capRot);
+      ctx.font = '900 15px ui-monospace, monospace';
+      const txt = `"${pa.capsuleText}"  ▼`;
+      const tw = ctx.measureText(txt).width;
+      const bw = Math.min(contentW - 64, tw + 34), bh = 38;
+      ctx.fillStyle = 'rgba(10, 22, 38, 0.88)';
+      ctx.strokeStyle = 'rgba(80, 224, 248, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+      ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
+      ctx.fillStyle = '#d6ecff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(txt, 0, 1);
+      ctx.restore();
+    }
+
+    // Horizontal dashed tier line + Pink "YOU ◀" badge at current depth during play!
+    if (game.view === 'play') {
+      const youY = Math.round(scene.h * 0.52);
+      if (scene.lastTierMark) {
+        const my = Math.round(centerScreenY + (scene.lastTierMark.depth - scene.cameraDepth) * PX_PER_METER);
+        if (my > 40 && my < scene.h - 40) {
+          ctx.strokeStyle = scene.lastTierMark.color; ctx.globalAlpha = 0.45; ctx.setLineDash([4, 4]);
+          ctx.beginPath(); ctx.moveTo(contentLeft + 20, my); ctx.lineTo(rulerX - 14, my); ctx.stroke();
+          ctx.globalAlpha = 0.9; ctx.fillStyle = scene.lastTierMark.color; ctx.textAlign = 'right';
+          ctx.fillText(scene.lastTierMark.label, rulerX - 48, my - 4);
+        }
+      }
+      ctx.globalAlpha = 1; ctx.setLineDash([]);
+      ctx.fillStyle = '#e6557e';
+      ctx.fillRect(rulerX - 42, youY - 8, 36, 15);
+      ctx.fillStyle = '#071422'; ctx.font = '900 9px ui-monospace, monospace'; ctx.textAlign = 'center';
+      ctx.fillText('YOU ◀', rulerX - 24, youY + 3);
+    }
+    ctx.restore();
+
+    // 5. ANIMATED EQUIPPED DIVER SKIN SPRITE (Krill, Puffer, Squid, Angler, Mantis, Leviathan!)
+    const activeSkin = SKINS.find(sk => sk.id === store.selectedSkin) || SKINS[0];
+    const diverImg = SPRITE_IMGS[activeSkin.sprite] || krillImg;
+    if (scene.krillVisible && diverImg && diverImg.complete && diverImg.naturalWidth > 0) {
+      const kx = contentLeft + contentW * scene.krillX;
+      const ky = scene.h * scene.krillY;
+      scene.krillScaleX += (1 - scene.krillScaleX) * Math.min(1, dt * 7);
+      scene.krillScaleY = 1 / Math.max(0.65, scene.krillScaleX);
+      const divePitch = Math.min(0.75, scene.plungeSpeed * 0.0014);
+      scene.krillTilt += (divePitch - scene.krillTilt) * Math.min(1, dt * 6);
+      const bobY = Math.sin(scene.time * 3.2) * 5;
+
+      if (!settings.lowPower && Math.random() < (scene.plungeSpeed > 40 ? 0.65 : 0.14)) {
+        spawnParticle(kx + (Math.random() - 0.5) * 14, ky + bobY - 18, (Math.random() - 0.5) * 24, -65 - scene.plungeSpeed * 0.18, 2 + Math.random() * 2.5, 0.75, 'rgba(130,224,255,0.65)', 'bubble');
+      }
+
+      const sz = activeSkin.sprite === 'leviathan' ? 78 : 68;
+      ctx.save();
+      ctx.translate(kx, ky + bobY);
+      ctx.rotate(Math.sin(scene.time * 2.2) * 0.08 + scene.krillTilt);
+      ctx.scale(scene.krillScaleX, scene.krillScaleY);
+      ctx.filter = activeSkin.filter;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(diverImg, -sz / 2, -sz / 2, sz, sz);
+      ctx.restore();
+    }
+
+    // Rings, Particles & Flash
+    for (let i = 0; i < scene.rings.length; i++) {
+      const rg = scene.rings[i]; if (!rg.active) continue;
+      rg.life -= dt; if (rg.life <= 0) { rg.active = false; continue; }
+      const p = 1 - rg.life / rg.maxLife;
+      rg.r = 12 + (rg.maxR - 12) * (1 - Math.pow(2, -8 * p));
+      ctx.save(); ctx.strokeStyle = rg.color; ctx.globalAlpha = Math.max(0, 1 - p) * 0.75; ctx.lineWidth = Math.max(1, 4.5 * (1 - p));
+      ctx.beginPath(); ctx.arc(rg.x, rg.y, rg.r, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+    for (let i = 0; i < scene.particles.length; i++) {
+      const pt = scene.particles[i]; if (!pt.active) continue;
+      pt.life -= dt; if (pt.life <= 0) { pt.active = false; continue; }
+      pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vx *= Math.exp(-2.2 * dt);
+      if (pt.kind === 'bubble') pt.vy -= 22 * dt;
+      ctx.save(); ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+      if (pt.kind === 'spark') {
+        ctx.fillStyle = pt.color; ctx.fillRect(Math.round(pt.x), Math.round(pt.y), Math.ceil(pt.r), Math.ceil(pt.r));
+      } else {
+        ctx.strokeStyle = pt.color; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (scene.flashAlpha > 0.002) {
+      ctx.save(); ctx.globalAlpha = scene.flashAlpha; ctx.fillStyle = scene.flashColor;
+      ctx.fillRect(-20, -20, scene.w + 40, scene.h + 40); ctx.restore();
+      scene.flashAlpha = Math.max(0, scene.flashAlpha - dt * 0.9);
+    }
+
+    ctx.restore();
+    requestAnimationFrame(renderScene);
+  }
+
+  // =========================================================================
+  // STATE, STORAGE & VIEW ROUTER
+  // =========================================================================
+  const TODAY_DIVE_NUM = 132;
+  function loadStore() {
+    try { const r = localStorage.getItem('krillion_live_v3'); return r ? JSON.parse(r) : { bestDepth: 0, totalDives: 0, streak: 1, selectedSkin: 'krill', completedDives: {}, playerName: '' }; }
+    catch (_) { return { bestDepth: 0, totalDives: 0, streak: 1, selectedSkin: 'krill', completedDives: {}, playerName: '' }; }
+  }
+  function saveStore(s) { try { localStorage.setItem('krillion_live_v3', JSON.stringify(s)); } catch (_) {} }
+  const store = loadStore();
+
+  const game = {
+    view: 'home', mode: 'daily', modeTitle: 'DIVE #132', diveNum: TODAY_DIVE_NUM,
+    prompts: [], index: 0, results: [], totalPts: 0, phase: 'idle',
+    pendingCorrection: null, timeLeft: 25, timerId: null, stepTimeout: null, descentTimer: null, lastTickSec: 6,
+
+  };
+
+  const $ = id => document.getElementById(id);
+  const views = {
+    home: $('viewHome'), play: $('viewPlay'), results: $('viewResults'),
+    pufferLobby: $('viewPufferLobby'), puffer: $('viewPuffer'),
+    archive: $('viewArchive'), packs: $('viewPacks'), mykrillion: $('viewMyKrillion'),
+    friends: $('viewFriends'), how: $('viewHow'), merch: $('viewMerch')
+  };
+
+  function showToast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = '1'; clearTimeout(t._tid); t._tid = setTimeout(() => { t.style.opacity = '0'; }, 2200); }
+  function closeAllModals() { $('menuModal').classList.add('hidden'); $('skinsModal').classList.add('hidden'); $('settingsModal').classList.add('hidden'); }
+
+  function switchView(name) {
+    stopDiveTimers(); stopPufferLoop(); closeAllModals();
+    game.view = name;
+    Object.entries(views).forEach(([k, el]) => el.classList.toggle('hidden', k !== name));
+    $('homeTopControls').classList.toggle('hidden', name === 'play');
+    if (name === 'home') {
+      scene.targetWaterlineRatio = 0.641; scene.targetDepth = 0; scene.cameraDepth = 0; scene.krillVisible = false; scene.lastTierMark = null; scene.plungeAnim = null;
+    } else if (name === 'play') {
+      scene.krillVisible = true;
+    } else {
+      scene.targetWaterlineRatio = -0.15; scene.krillVisible = false;
+    }
+  }
+
+  // =========================================================================
+  // EXACT REAL-SITE DIVE FLOW:
+  // Countdown 3-2-1 -> Answer (25s + "no echo. try again") -> Capsule ->
+  // FULL-SCREEN OCEAN PLUNGE -> Center Tier Reveal -> DESCEND ▼ / SURFACE ▲
+  // =========================================================================
+  function stopDiveTimers() {
+    if (game.timerId) { clearInterval(game.timerId); game.timerId = null; }
+    if (game.descentTimer) { clearInterval(game.descentTimer); game.descentTimer = null; }
+    if (game.stepTimeout) { clearTimeout(game.stepTimeout); game.stepTimeout = null; }
+  }
+
+  function updateProgressPips() {
+    $('hudPromptSub').textContent = game.mode === 'unlimited' ? `PROMPT #${game.index + 1}` : `PROMPT ${game.index + 1} OF ${game.prompts.length}`;
+    const wrap = $('promptProgressWrap'); wrap.innerHTML = '';
+    const total = game.mode === 'unlimited' ? 7 : game.prompts.length;
+    for (let i = 0; i < total; i++) {
+      const pip = document.createElement('div');
+      pip.className = 'w-4 h-3 border border-[#1d354f] transition-colors';
+      if (i < game.results.length) pip.style.backgroundColor = '#facc15'; // Yellow completed pip (verified on live site!)
+      else if (i === game.index && game.mode !== 'unlimited') pip.style.backgroundColor = '#e6557e';
+      else pip.style.backgroundColor = '#0c1d30';
+      wrap.appendChild(pip);
+    }
+  }
+
+  function startDive({ mode, title, diveNum, prompts }) {
+    audio.unlock(); audio.playPlungeWhoosh(0.8);
+    game.mode = mode; game.modeTitle = title; game.diveNum = diveNum || TODAY_DIVE_NUM;
+    game.prompts = prompts; game.index = 0; game.results = []; game.totalPts = 0;
+
+    scene.cameraDepth = 0; scene.targetDepth = 0; scene.displayScore = 0; scene.targetScore = 0; scene.lastTierMark = null;
+    switchView('play');
+    $('unlimitedFooter').classList.toggle('hidden', mode !== 'unlimited');
+    $('hudDepthMeters').textContent = '0m'; $('hudScoreVal').textContent = '0';
+    beginPromptCountdown(true);
+  }
+
+  function beginPromptCountdown(isFirst = false) {
+    stopDiveTimers();
+    game.phase = 'countdown';
+    game.pendingCorrection = null;
+    updateProgressPips();
+
+    const p = game.prompts[game.index];
+    $('promptPackLabel').textContent = game.mode === 'unlimited' ? `PROMPT #${game.index + 1}` : `PROMPT ${game.index + 1} OF ${game.prompts.length}`;
+    $('promptQuestion').textContent = p.q;
+
+    $('tierRevealBanner').classList.add('hidden');
+    $('descendActionWrap').classList.add('hidden');
+    $('checkingOverlay').classList.add('hidden');
+    $('submittedCapsule').classList.add('hidden');
+    $('echoNotice').classList.add('hidden');
+    $('answerForm').classList.add('hidden');
+    $('promptCardBox').classList.remove('hidden');
+    $('descentCountdownBar').classList.remove('hidden');
+
+    if (isFirst) {
+      scene.waterlineRatio = 0.56; scene.targetWaterlineRatio = 0.25;
+      scene.krillX = 0.72; scene.krillY = 0.44;
+      scene.targetKrillX = 0.16; scene.targetKrillY = 0.68;
+    } else {
+      scene.targetWaterlineRatio = -0.15;
+      scene.targetKrillX = 0.16; scene.targetKrillY = 0.68;
+    }
+
+    let cnt = 3;
+    $('descentCountNum').textContent = String(cnt);
+    game.descentTimer = setInterval(() => {
+      cnt--;
+      if (cnt > 0) {
+        $('descentCountNum').textContent = String(cnt);
+        audio.playBubble(450 + (3 - cnt) * 55);
+      } else {
+        clearInterval(game.descentTimer); game.descentTimer = null;
+        $('descentCountdownBar').classList.add('hidden');
+        startPromptClock();
+      }
+    }, 520);
+  }
+
+  function startPromptClock() {
+    game.phase = 'answering';
+    $('answerForm').classList.remove('hidden');
+    $('answerInput').value = '';
+    $('answerInput').disabled = false;
+    $('submitAnswerBtn').disabled = false;
+    $('answerInput').focus();
+    game.timeLeft = 25; game.lastTickSec = 6; updateTimerUI();
+    const startTs = performance.now();
+    game.timerId = setInterval(() => {
+      game.timeLeft = Math.max(0, 25 - (performance.now() - startTs) / 1000);
+      updateTimerUI();
+      if (game.timeLeft <= 5 && Math.ceil(game.timeLeft) < game.lastTickSec && game.timeLeft > 0) {
+        game.lastTickSec = Math.ceil(game.timeLeft); audio.playTick(game.lastTickSec <= 3);
+      }
+      if (game.timeLeft <= 0) executePlungeSequence(TIERS_BASE.miss, '(Time out)', false);
+    }, 60);
+  }
+
+  function updateTimerUI() {
+    const secs = Math.ceil(game.timeLeft);
+    $('timerText').textContent = String(secs);
+    const circ = 119.38;
+    $('timerRing').style.strokeDashoffset = (circ * (1 - Math.max(0, game.timeLeft / 25))).toFixed(2);
+    const col = game.timeLeft <= 5 ? '#f43f5e' : (game.timeLeft <= 10 ? '#fbbf24' : '#50e0f8');
+    $('timerRing').style.stroke = col; $('timerText').style.color = col;
+  }
+
+  function handleAnswerSubmit() {
+    if (game.phase !== 'answering') return;
+    audio.unlock();
+    const raw = $('answerInput').value.trim();
+    if (!raw) return;
+    const p = game.prompts[game.index];
+
+    if (game.pendingCorrection && normalizeText(raw) === normalizeText(game.pendingCorrection.raw)) {
+      const ev = game.pendingCorrection.ev; game.pendingCorrection = null;
+      executePlungeSequence(ev.tier, ev.canonical, true); return;
+    }
+
+    const ev = evaluateAnswer(p, raw);
+    if (!ev.matched) {
+      audio.playNoEcho();
+      const notice = $('echoNotice');
+      notice.textContent = `"${raw}": no echo. try again`;
+      notice.style.color = '#e88a5a';
+      notice.classList.remove('hidden', 'shake-x'); void notice.offsetWidth; notice.classList.add('shake-x');
+      if (settings.clearRejected) $('answerInput').value = '';
+      $('answerInput').focus();
+      return;
+    }
+
+    if (ev.corrected && settings.corrections) {
+      game.pendingCorrection = { raw: ev.canonical, ev };
+      $('answerInput').value = ev.canonical;
+      const notice = $('echoNotice');
+      notice.innerHTML = `<span class="text-[#8ba6c2]">"${raw}"</span> <span class="text-[#50e0f8]">→</span> <span class="text-[#50e0f8]">"${ev.canonical}"</span><div class="text-[10px] text-[#6d8ba8] mt-0.5">Submit again to confirm · or edit</div>`;
+      notice.classList.remove('hidden');
+      audio.playBubble(560);
+      $('answerInput').focus();
+      return;
+    }
+
+    executePlungeSequence(ev.tier, ev.canonical, true);
+  }
+
+  // THE REAL FULL-SCREEN OCEAN PLUNGE SEQUENCE (Matched 1:1 to 1000066673.mp4!)
+  function executePlungeSequence(tier, canonical, matched) {
+    stopDiveTimers();
+    game.phase = 'plunging';
+    game.pendingCorrection = null;
+
+    $('answerForm').classList.add('hidden');
+    $('echoNotice').classList.add('hidden');
+    $('promptCardBox').classList.add('hidden');
+    $('submittedCapsule').classList.add('hidden');
+
+    const p = game.prompts[game.index];
+    const boosted = false;
+    const earnedPts = tier.pts;
+
+    const startDepth = scene.cameraDepth;
+    game.totalPts += earnedPts;
+    const newDepth = game.totalPts * 10;
+    game.results.push({ prompt: p, canonical, tier: { ...tier, pts: earnedPts }, matched, cumDepth: newDepth });
+
+    // Build all 6 relative tier gate lines below startDepth so you watch your capsule break through each one!
+    const mult = boosted ? 1.5 : 1;
+    const gates = [
+      { label: 'PLANKTON',          pts: Math.round(10 * mult),  depth: startDepth + Math.round(100 * mult),  color: '#88b4cc', crossed: false },
+      { label: 'TOO CLEVER',        pts: Math.round(15 * mult),  depth: startDepth + Math.round(150 * mult),  color: '#2dd4bf', crossed: false },
+      { label: 'SCHOOLER',          pts: Math.round(30 * mult),  depth: startDepth + Math.round(300 * mult),  color: '#50e0f8', crossed: false },
+      { label: 'RARE',              pts: Math.round(60 * mult),  depth: startDepth + Math.round(600 * mult),  color: '#e6557e', crossed: false },
+      { label: 'DEEP CUT',          pts: Math.round(85 * mult),  depth: startDepth + Math.round(850 * mult),  color: '#a855f7', crossed: false },
+      { label: 'ONE IN A KRILLION', pts: Math.round(100 * mult), depth: startDepth + Math.round(1000 * mult), color: '#facc15', crossed: false }
+    ];
+
+    const plungeMs = earnedPts <= 0 ? 450 : Math.min(3100, 1150 + earnedPts * 18);
+    scene.targetWaterlineRatio = -0.28;
+    scene.targetDepth = newDepth;
+    scene.targetScore = game.totalPts;
+    scene.lastTierMark = earnedPts > 0 ? { depth: newDepth, label: `${tier.label} · ${earnedPts}`, color: getTierColor(tier) } : null;
+
+    // Move krill cleanly near center-right beside the sinking capsule (Video 00:27-00:30 & 00:40-00:42!)
+    scene.targetKrillX = earnedPts > 0 ? 0.66 : 0.56;
+    scene.targetKrillY = 0.50;
+    scene.krillScaleX = 0.78;
+    updateProgressPips();
+
+    if (earnedPts > 0) {
+      scene.plungeAnim = {
+        startDepth, endDepth: newDepth, startTime: performance.now(), duration: plungeMs,
+        capsuleText: canonical.toUpperCase(), gates
+      };
+      audio.playPlungeWhoosh(plungeMs / 1000);
+    }
+
+    // After smooth plunge settles at target depth, slide Krill left-of-bubbles and burst open Tier Reveal!
+    game.stepTimeout = setTimeout(() => {
+      scene.plungeAnim = null;
+      game.phase = 'reveal';
+      scene.targetKrillX = 0.22;
+      scene.targetKrillY = 0.36;
+
+      const col = getTierColor(tier);
+      audio.playTierReward(tier.key);
+      if (earnedPts > 0) burstTierFireworks(tier);
+      if (!settings.lowPower && earnedPts >= 60) { scene.flashColor = col; scene.flashAlpha = earnedPts >= 100 ? 0.22 : 0.11; }
+
+      const tierSpriteKey = { miss: 'krill', plankton: 'krill', clever: 'puffer', schooler: 'puffer', rare: 'squid', deepcut: 'angler', krillion: 'leviathan' }[tier.key] || 'krill';
+      $('revealCreatureIcon').src = SPRITE_SRCS[tierSpriteKey];
+      $('revealCreatureIcon').style.filter = tier.key === 'miss' ? 'grayscale(1) brightness(0.6)' : 'none';
+      $('revealTierTitle').textContent = tier.label;
+      $('revealTierTitle').style.color = col;
+      $('revealAnswerQuote').textContent = `"${canonical}"`;
+      $('revealPtsDepth').textContent = earnedPts <= 0
+        ? '+0 PTS'
+        : (boosted ? `+${earnedPts} PTS (1.5× BOOST!) · sink ${(earnedPts * 10).toLocaleString()}m` : `+${earnedPts} PTS · sink ${(earnedPts * 10).toLocaleString()}m`);
+      $('revealPtsDepth').style.color = col;
+      $('revealFlavor').textContent = tier.flavor;
+      $('tierRevealBanner').classList.remove('hidden');
+
+      const isLast = game.mode !== 'unlimited' && game.index >= game.prompts.length - 1;
+      const btn = $('descendNextBtn');
+      btn.textContent = isLast ? 'SURFACE ▲' : 'DESCEND ▼';
+      btn.style.borderColor = '#50e0f8';
+      $('descendActionWrap').classList.remove('hidden');
+
+      if (game.mode === 'unlimited') {
+        $('unlimitedStats').textContent = `Answered: ${game.results.length} · Avg: ${Math.round(game.totalPts / game.results.length)} pts`;
+      }
+    }, plungeMs + 140);
+  }
+
+  function handleDescendOrSurface() {
+    if (game.phase !== 'reveal') return;
+    audio.unlock(); audio.playBubble(560);
+    const isLast = game.mode !== 'unlimited' && game.index >= game.prompts.length - 1;
+    if (isLast) {
+      // Exact live-site "CHECKING YOUR RESULT..." transition before surfacing!
+      $('tierRevealBanner').classList.add('hidden');
+      $('descendActionWrap').classList.add('hidden');
+      $('checkingOverlay').classList.remove('hidden');
+      scene.targetDepth = Math.max(0, scene.cameraDepth - 600);
+      game.stepTimeout = setTimeout(() => finishDive(), 850);
+      return;
+    }
+    game.index++;
+    if (game.mode === 'unlimited' && game.index >= game.prompts.length) {
+      game.prompts = game.prompts.concat(seededShuffle(PROMPTS, Date.now() & 0xffff));
+    }
+    beginPromptCountdown(false);
+  }
+
+  // =========================================================================
+  // DIVE COMPLETE SUMMARY: BELL CURVE + DIVE LOG + THE BEARING + EXPANDABLE CATCH
+  // =========================================================================
+  function finishDive() {
+    stopDiveTimers();
+    const depth = game.totalPts * 10;
+    if (depth > (store.bestDepth || 0)) store.bestDepth = depth;
+    store.totalDives = (store.totalDives || 0) + 1;
+    if (game.mode === 'daily' || game.mode === 'archive') {
+      store.completedDives[game.diveNum] = Math.max(store.completedDives[game.diveNum] || 0, depth);
+    }
+    saveStore(store);
+    switchView('results');
+
+    const maxP = Math.max(100, game.results.length * 100);
+    const score700 = Math.round((game.totalPts / maxP) * 700);
+    const pct = Math.min(99, Math.max(5, Math.round(8 + (score700 / 700) * 90)));
+    $('resTitleTag').textContent = `${game.modeTitle} COMPLETE`;
+    $('resTotalPts').textContent = String(game.totalPts);
+    $('resTotalDepth').textContent = `-${depth.toLocaleString()}m`;
+    $('resPercentileText').textContent = `BETTER THAN ${pct}% OF TODAY'S PLAYERS`;
+
+    // 1. Bell Curve SVG (0..700 with pink YOU line)
+    const svg = $('bellCurveSvg');
+    let dPath = 'M 0 84 ';
+    for (let x = 0; x <= 320; x += 4) {
+      const t = (x / 320 - 0.44) / 0.19;
+      const y = 84 - Math.exp(-0.5 * t * t) * 68;
+      dPath += `L ${x} ${y.toFixed(1)} `;
+    }
+    const youX = Math.max(8, Math.min(312, (score700 / 700) * 320));
+    const tY = (youX / 320 - 0.44) / 0.19;
+    const youY = 84 - Math.exp(-0.5 * tY * tY) * 68;
+    svg.innerHTML = `
+      <path d="${dPath} L 320 84 Z" fill="rgba(80,224,248,0.16)" />
+      <path d="${dPath}" fill="none" stroke="#50e0f8" stroke-width="2.2" />
+      <line x1="${youX.toFixed(1)}" y1="10" x2="${youX.toFixed(1)}" y2="84" stroke="#e6557e" stroke-width="2" stroke-dasharray="3,3" />
+      <circle cx="${youX.toFixed(1)}" cy="${youY.toFixed(1)}" r="4.5" fill="#e6557e" />
+      <text x="${Math.min(296, Math.max(24, youX)).toFixed(1)}" y="11" fill="#e6557e" font-size="9" font-weight="900" text-anchor="middle" font-family="monospace">YOU</text>
+    `;
+
+    // 2. DIVE LOG (7 vertical drop lines)
+    const drops = $('diveLogDrops'); drops.innerHTML = '';
+    game.results.slice(0, 7).forEach((r, idx) => {
+      const col = getTierColor(r.tier);
+      const hPct = Math.max(12, r.tier.pts);
+      const wrap = document.createElement('div');
+      wrap.className = 'flex flex-col items-center h-full';
+      wrap.innerHTML = `
+        <div class="text-[9px] mono text-[#5e7c99] mb-1">#${idx + 1}</div>
+        <div class="w-[2px] flex-shrink-0" style="height:${Math.round(hPct * 0.62)}px;background:${col};opacity:0.75"></div>
+        <img src="${KRILL_SPRITE_SRC}" alt="" class="w-5 h-5 object-contain pixel-art -mt-1" style="filter:${r.tier.filter}" />
+        <div class="text-[9px] mono font-bold mt-0.5" style="color:${col}">${r.tier.pts}</div>`;
+      drops.appendChild(wrap);
+    });
+
+    // 3. THE BEARING (5 bands)
+    const bands = [
+      { label: 'Plankton', range: '0-150',   min: 0,   max: 150, col: '#94a3b8' },
+      { label: 'Schooler', range: '151-250', min: 151, max: 250, col: '#50e0f8' },
+      { label: 'Rare',     range: '251-350', min: 251, max: 350, col: '#e6557e' },
+      { label: 'Deep Cut', range: '351-449', min: 351, max: 449, col: '#a855f7' },
+      { label: 'Krillion', range: '450+',    min: 450, max: 9999,col: '#facc15' }
+    ];
+    const bearing = $('bearingBands'); bearing.innerHTML = '';
+    bands.forEach(b => {
+      const active = score700 >= b.min && score700 <= b.max;
+      const el = document.createElement('div');
+      el.className = `py-2 px-1 border ${active ? 'bg-[#10243d]' : 'bg-[#081525] opacity-55'}`;
+      el.style.borderColor = active ? b.col : '#182e46';
+      el.innerHTML = `<div class="text-[9px] font-black uppercase truncate" style="color:${b.col}">${b.label}</div><div class="text-[8px] mono text-[#7d9ab8] mt-0.5">${b.range}</div>`;
+      bearing.appendChild(el);
+    });
+
+    // 4. EXPANDABLE THE CATCH (Tap any round -> filter tabs + search all answers!)
+    const list = $('catchList'); list.innerHTML = '';
+    game.results.forEach((r, idx) => {
+      const col = getTierColor(r.tier);
+      const crowdCount = r.tier.pts <= 15 ? (14000 + idx * 1723) : (r.tier.pts === 30 ? 4210 : (r.tier.pts === 60 ? 640 : (r.tier.pts === 85 ? 84 : 7)));
+      const allEntries = [
+        ...r.prompt.k.map(a => ({ a: titleCase(a), t: TIERS_BASE.krillion })),
+        ...r.prompt.d.map(a => ({ a: titleCase(a), t: TIERS_BASE.deepcut })),
+        ...r.prompt.r.map(a => ({ a: titleCase(a), t: TIERS_BASE.rare })),
+        ...r.prompt.s.map(a => ({ a: titleCase(a), t: TIERS_BASE.schooler })),
+        ...r.prompt.c.map(a => ({ a: titleCase(a), t: TIERS_BASE.clever })),
+        ...r.prompt.p.map(a => ({ a: titleCase(a), t: TIERS_BASE.plankton }))
+      ];
+
+      const card = document.createElement('div');
+      card.className = 'bg-[#06111e] border border-[#182f48]';
+      card.innerHTML = `
+        <button type="button" class="catch-toggle w-full p-3.5 text-left flex items-center justify-between gap-2 hover:bg-[#0c1d33] transition">
+          <div class="min-w-0">
+            <div class="text-[11px] font-bold text-[#cce4f7] truncate">${idx + 1}. ${r.prompt.q}</div>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="text-xs font-black text-white">${r.canonical}</span>
+              <span class="text-[10px] font-bold uppercase" style="color:${col}">${r.tier.label}</span>
+            </div>
+            <div class="text-[10px] text-[#5e7c99] mt-0.5">${crowdCount.toLocaleString()} other players chose this</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="mono text-sm font-black" style="color:${col}">+${r.tier.pts}</div>
+            <div class="text-[9px] text-[#5e7c99]">▾ ALL ${allEntries.length}</div>
+          </div>
+        </button>
+        <div class="catch-drawer hidden px-3.5 pb-3.5 pt-2 border-t border-[#15283d] space-y-2">
+          <input type="text" placeholder="Search all answers..." class="catch-search w-full px-2.5 py-1.5 bg-[#081526] border border-[#1d354f] text-[11px] text-white placeholder-[#4b6a87] focus:border-[#50e0f8] focus:outline-none" />
+          <div class="catch-tabs flex flex-wrap gap-1"></div>
+          <div class="catch-rows max-h-40 overflow-y-auto divide-y divide-[#102033]"></div>
+        </div>`;
+
+      const drawer = card.querySelector('.catch-drawer');
+      const searchInp = card.querySelector('.catch-search');
+      const tabsWrap = card.querySelector('.catch-tabs');
+      const rowsWrap = card.querySelector('.catch-rows');
+      let activeFilter = 'all';
+
+      const renderRows = () => {
+        const q = normalizeText(searchInp.value);
+        const filtered = allEntries.filter(e => (activeFilter === 'all' || e.t.key === activeFilter) && (!q || normalizeText(e.a).includes(q)));
+        rowsWrap.innerHTML = filtered.map(e => `
+          <div class="py-1.5 flex items-center justify-between text-[11px]">
+            <span class="text-[#dbeeff]">${e.a}</span>
+            <span class="mono font-bold" style="color:${getTierColor(e.t)}">+${e.t.pts}</span>
+          </div>`).join('') || '<div class="py-2 text-[11px] text-[#5e7c99]">No matching answers</div>';
+      };
+
+      const filterDefs = [
+        ['all', `All ${allEntries.length}`], ['krillion', `Krillion ${r.prompt.k.length}`],
+        ['deepcut', `Deep Cut ${r.prompt.d.length}`], ['rare', `Rare ${r.prompt.r.length}`],
+        ['schooler', `Schooler ${r.prompt.s.length}`], ['plankton', `Plankton ${r.prompt.p.length}`]
+      ];
+      filterDefs.forEach(([fk, flabel]) => {
+        const tb = document.createElement('button');
+        tb.type = 'button';
+        tb.className = `px-2 py-0.5 text-[9px] font-bold uppercase border ${fk === 'all' ? 'bg-[#50e0f8] text-[#071422] border-[#50e0f8]' : 'bg-[#081526] text-[#8ba6c2] border-[#1c334c]'}`;
+        tb.textContent = flabel;
+        tb.addEventListener('click', () => {
+          activeFilter = fk;
+          tabsWrap.querySelectorAll('button').forEach(b => b.className = 'px-2 py-0.5 text-[9px] font-bold uppercase border bg-[#081526] text-[#8ba6c2] border-[#1c334c]');
+          tb.className = 'px-2 py-0.5 text-[9px] font-bold uppercase border bg-[#50e0f8] text-[#071422] border-[#50e0f8]';
+          renderRows();
+        });
+        tabsWrap.appendChild(tb);
+      });
+
+      searchInp.addEventListener('input', renderRows);
+      card.querySelector('.catch-toggle').addEventListener('click', () => {
+        audio.playBubble(500);
+        drawer.classList.toggle('hidden');
+        if (!drawer.classList.contains('hidden')) renderRows();
+      });
+      list.appendChild(card);
+    });
+  }
+
+  function copyShareCard() {
+    audio.playBubble(640);
+    const sq = { miss: '⬛', plankton: '⬜', clever: '🟩', schooler: '🟦', rare: '🟥', deepcut: '🟪', krillion: '🟨' };
+    let text = `KRILLION · ${game.modeTitle}\n${game.totalPts} pts (-${(game.totalPts * 10).toLocaleString()}m)\n${game.results.map(r => sq[r.tier.key]).join('')}`;
+    if (settings.shareLink) text += '\nhttps://krillion.io/';
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => showToast('Copied dive result!')).catch(() => fallbackCopy(text));
+    else fallbackCopy(text);
+  }
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); showToast('Copied dive result!'); } catch (_) {} document.body.removeChild(ta);
+  }
+
+  // =========================================================================
+  // SKINS, PUFFER LOBBY, PUFFER MATCH, ARCHIVE, PACKS & WIRING
+  // =========================================================================
+  function renderSkinsModal() {
+    const grid = $('skinsGrid'); grid.innerHTML = '';
+    SKINS.forEach(sk => {
+      const sel = store.selectedSkin === sk.id;
+      const card = document.createElement('button');
+      card.className = `p-4 bg-[#0b182a] flex flex-col items-center justify-center gap-2.5 transition ${sel ? 'border-2 border-[#50e0f8] bg-[#10243d]' : 'border border-[#1c314a] hover:border-[#3b5d80]'}`;
+      card.innerHTML = `
+        <div class="w-16 h-16 flex items-center justify-center">
+          <img src="${SPRITE_SRCS[sk.sprite]}" alt="${sk.name}" class="w-15 h-15 object-contain pixel-art" style="filter:${sk.filter}" />
+        </div>
+        <div class="text-center">
+          <div class="text-[11px] font-bold tracking-[0.14em] uppercase ${sel ? 'text-[#50e0f8]' : 'text-[#eef6ff]'}">${sk.name}</div>
+          <div class="text-[9px] tracking-[0.14em] uppercase mt-1 ${sel ? 'text-[#e6557e] font-bold' : 'text-[#5a7a99]'}">${sel ? 'EQUIPPED' : sk.tag}</div>
+        </div>`;
+      card.addEventListener('click', () => {
+        audio.unlock(); audio.playBubble(560);
+        store.selectedSkin = sk.id; saveStore(store); renderSkinsModal(); showToast(`Equipped ${sk.name}`);
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  let roomIsPublic = true;
+  function renderPufferLobby() {
+    $('pufferPlayerName').value = store.playerName || '';
+    const strip = $('lobbySkinStrip'); strip.innerHTML = '';
+    SKINS.forEach(sk => {
+      const sel = store.selectedSkin === sk.id;
+      const b = document.createElement('button');
+      b.className = `shrink-0 w-20 p-2 bg-[#06111e] flex flex-col items-center gap-1.5 ${sel ? 'border-2 border-[#e6557e]' : 'border border-[#1c314a]'}`;
+      b.innerHTML = `<img src="${SPRITE_SRCS[sk.sprite]}" alt="${sk.short}" class="w-10 h-10 object-contain pixel-art" style="filter:${sk.filter}" /><div class="text-[9px] font-bold uppercase ${sel ? 'text-[#50e0f8]' : 'text-[#6d8ba8]'}">${sk.short}</div><div class="text-[8px] text-[#5a7a99]">${sk.tag}</div>`;
+      b.addEventListener('click', () => { audio.unlock(); audio.playBubble(520); store.selectedSkin = sk.id; saveStore(store); renderPufferLobby(); });
+      strip.appendChild(b);
+    });
+    const list = $('publicRoomsList'); list.innerHTML = '';
+    PUBLIC_ROOMS.forEach(rm => {
+      const row = document.createElement('div');
+      row.className = 'py-3 flex items-center justify-between gap-3';
+      row.innerHTML = `<div class="flex items-center gap-3 min-w-0"><span class="text-sm font-black mono tracking-[0.16em] ${rm.full ? 'text-[#44637d]' : 'text-[#50e0f8]'}">${rm.code}</span><div class="truncate"><div class="text-xs font-bold text-[#e6f3ff] truncate">${rm.host}</div><div class="text-[10px] text-[#5e7c99] uppercase">${rm.cur}/${rm.max} · ${rm.status}</div></div></div>${rm.full ? '<span class="text-[10px] font-bold text-[#48637d] uppercase">FULL</span>' : '<button class="join-room-btn px-3 py-1.5 text-[11px] font-black text-[#e6557e] hover:text-white uppercase">JOIN ▸</button>'}`;
+      const btn = row.querySelector('.join-room-btn');
+      if (btn) btn.addEventListener('click', () => startPufferParty(rm.code, rm.host));
+      list.appendChild(row);
+    });
+  }
+
+  const puffer = { active: false, roomCode: 'KRLP', players: [], turnIdx: 0, prompt: null, used: new Set(), fuse: 14, maxFuse: 14, inflation: 1, loopId: null, botTimeout: null };
+  function stopPufferLoop() { puffer.active = false; if (puffer.loopId) { clearInterval(puffer.loopId); puffer.loopId = null; } if (puffer.botTimeout) { clearTimeout(puffer.botTimeout); puffer.botTimeout = null; } }
+  function startPufferParty(code = 'KRLP', hostName = 'Coral') {
+    audio.unlock(); audio.playBubble(580);
+    const pn = ($('pufferPlayerName').value || '').trim() || 'You';
+    store.playerName = pn === 'You' ? '' : pn; saveStore(store);
+    puffer.roomCode = code.toUpperCase(); switchView('puffer');
+    $('pufferRoomBadge').textContent = `ROOM · ${puffer.roomCode}`;
+    puffer.players = [{ id: 'you', name: pn, isBot: false, hearts: 3 }, { id: 'b1', name: `${hostName} (bot)`, isBot: true, hearts: 3 }, { id: 'b2', name: 'Manta (bot)', isBot: true, hearts: 3 }, { id: 'b3', name: 'Kelp (bot)', isBot: true, hearts: 3 }];
+    puffer.turnIdx = 0; startPufferRound();
+  }
+  function startPufferRound() {
+    stopPufferLoop();
+    const alive = puffer.players.filter(p => p.hearts > 0);
+    if (alive.length <= 1) { renderPufferPlayers(); $('pufferTurnLabel').textContent = alive[0] ? `${alive[0].name} WINS!` : 'MATCH OVER'; $('pufferEventLog').textContent = 'Click Rematch or Lobby.'; $('pufferInput').disabled = true; $('pufferSubmitBtn').disabled = true; return; }
+    puffer.active = true; puffer.prompt = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+    puffer.used = new Set(); puffer.maxFuse = 12 + Math.random() * 5; puffer.fuse = puffer.maxFuse; puffer.inflation = 1;
+    while (puffer.players[puffer.turnIdx].hearts <= 0) puffer.turnIdx = (puffer.turnIdx + 1) % puffer.players.length;
+    $('pufferPromptTitle').textContent = puffer.prompt.q; $('pufferUsedWrap').innerHTML = ''; $('pufferEventLog').textContent = 'Name a fresh answer to pass!';
+    updatePufferTurnUI();
+    let lastT = performance.now();
+    puffer.loopId = setInterval(() => {
+      if (!puffer.active) return;
+      const now = performance.now(); puffer.fuse = Math.max(0, puffer.fuse - (now - lastT) / 1000); lastT = now;
+      const r = puffer.fuse / puffer.maxFuse;
+      $('pufferFuseText').textContent = `Fuse: ${puffer.fuse.toFixed(1)}s`;
+      $('pufferFuseBar').style.width = `${r * 100}%`; $('pufferFuseBar').style.backgroundColor = r < 0.3 ? '#f43f5e' : (r < 0.6 ? '#fbbf24' : '#50e0f8');
+      $('pufferStageSprite').style.transform = `scale(${Math.max(0.85, Math.min(1.65, puffer.inflation + (1 - r) * 0.45 + Math.sin(now * 0.015) * (r < 0.3 ? 0.08 : 0.025))).toFixed(3)})`;
+      if (puffer.fuse <= 0) triggerPufferPop();
+    }, 60);
+  }
+  function renderPufferPlayers() {
+    const wrap = $('pufferPlayers'); wrap.innerHTML = '';
+    puffer.players.forEach((pl, i) => {
+      const isT = i === puffer.turnIdx && puffer.active;
+      const el = document.createElement('div');
+      el.className = `p-2.5 border ${isT ? 'bg-[#122b44] border-[#50e0f8]' : 'bg-[#06111e] border-[#16293f]'} ${pl.hearts <= 0 ? 'opacity-40' : ''}`;
+      el.innerHTML = `<div class="text-[11px] font-bold truncate ${isT ? 'text-[#50e0f8]' : 'text-[#cce4f7]'}">${pl.name}</div><div class="flex gap-1 mt-1.5">${Array.from({length:3},(_,idx)=>`<span class="inline-block w-2 h-2 ${idx<pl.hearts?'bg-[#e6557e]':'bg-[#1e3247]'}"></span>`).join('')}</div>`;
+      wrap.appendChild(el);
+    });
+  }
+  function updatePufferTurnUI() {
+    renderPufferPlayers();
+    const cur = puffer.players[puffer.turnIdx], hum = !cur.isBot;
+    $('pufferTurnLabel').textContent = hum ? 'YOUR TURN — PASS!' : `${cur.name} thinking...`;
+    $('pufferInput').disabled = !hum; $('pufferSubmitBtn').disabled = !hum;
+    if (hum) { $('pufferInput').value = ''; $('pufferInput').focus(); }
+    else {
+      clearTimeout(puffer.botTimeout);
+      puffer.botTimeout = setTimeout(() => {
+        if (!puffer.active) return;
+        const p = puffer.prompt, pool = [...p.p, ...p.s, ...p.c, ...p.r, ...p.d].filter(a => !puffer.used.has(normalizeText(a)));
+        if (pool.length) handlePufferSubmission(pool[Math.floor(Math.random() * Math.min(pool.length, 14))], true);
+      }, 1300 + Math.random() * 1700);
+    }
+  }
+  function handlePufferSubmission(raw, fromBot = false) {
+    if (!puffer.active) return;
+    const ev = evaluateAnswer(puffer.prompt, raw), norm = normalizeText(ev.canonical);
+    if (!ev.matched) { if (!fromBot) { audio.playNoEcho(); $('pufferEventLog').textContent = `"${raw.trim()}": no echo. try again`; } return; }
+    if (puffer.used.has(norm)) { if (!fromBot) { audio.playNoEcho(); $('pufferEventLog').textContent = `"${ev.canonical}" already used!`; } return; }
+    puffer.used.add(norm);
+    const chip = document.createElement('span'); chip.className = 'px-2 py-0.5 text-[10px] font-bold bg-[#06111e] border text-[#cce4f7]';
+    chip.style.borderColor = getTierColor(ev.tier); chip.textContent = ev.canonical; $('pufferUsedWrap').appendChild(chip);
+    const cur = puffer.players[puffer.turnIdx];
+    if (ev.tier.pts >= 60) { puffer.inflation = Math.max(0.88, puffer.inflation - 0.12); puffer.fuse = Math.min(puffer.maxFuse, puffer.fuse + 1.8); $('pufferEventLog').textContent = `${cur.name}: ${ev.canonical} (${ev.tier.label}) — cooled!`; }
+    else { puffer.inflation = Math.min(1.45, puffer.inflation + 0.08); $('pufferEventLog').textContent = `${cur.name}: ${ev.canonical} (${ev.tier.label}) — swelled!`; }
+    audio.playTierReward(ev.tier.key);
+    do { puffer.turnIdx = (puffer.turnIdx + 1) % puffer.players.length; } while (puffer.players[puffer.turnIdx].hearts <= 0);
+    updatePufferTurnUI();
+  }
+  function triggerPufferPop() {
+    stopPufferLoop(); audio.playPufferPop(); scene.trauma = Math.min(1, scene.trauma + 0.85);
+    const v = puffer.players[puffer.turnIdx]; v.hearts = Math.max(0, v.hearts - 1);
+    renderPufferPlayers(); $('pufferEventLog').textContent = `POP! ${v.name} lost a heart!`;
+    $('pufferStageSprite').style.transform = 'scale(1.8)';
+    setTimeout(() => { $('pufferStageSprite').style.transform = 'scale(1)'; if (game.view === 'puffer') startPufferRound(); }, 1400);
+  }
+
+  function renderArchive() {
+    const g = $('archiveGrid'); g.innerHTML = '';
+    for (let n = TODAY_DIVE_NUM; n >= TODAY_DIVE_NUM - 7; n--) {
+      const best = store.completedDives[n];
+      const b = document.createElement('button');
+      b.className = 'p-3.5 bg-[#06111e] hover:bg-[#10233a] border border-[#1d354f] hover:border-[#50e0f8] text-left flex items-center justify-between';
+      b.innerHTML = `<div><div class="text-xs font-black text-white uppercase">DIVE #${n} ${n===TODAY_DIVE_NUM?'<span class="text-[#50e0f8] text-[9px] ml-1">TODAY</span>':''}</div><div class="text-[10px] text-[#7d9ab8]">7 prompts · 7,000m max</div></div><div class="mono text-xs font-bold ${best?'text-[#50e0f8]':'text-[#4c6782]'}">${best?'-'+best.toLocaleString()+'m':'PLAY'}</div>`;
+      b.addEventListener('click', () => startDive({ mode: n === TODAY_DIVE_NUM ? 'daily' : 'archive', title: `DIVE #${n}`, diveNum: n, prompts: getDivePromptsForNumber(n) }));
+      g.appendChild(b);
+    }
+  }
+  function renderPacks() {
+    const g = $('packsGrid'); g.innerHTML = '';
+    PACKS.forEach(pk => {
+      const b = document.createElement('button');
+      b.className = 'p-3.5 bg-[#06111e] hover:bg-[#10233a] border border-[#1d354f] hover:border-[#50e0f8] text-left';
+      b.innerHTML = `<div class="flex items-center justify-between mb-1"><span class="text-xs font-black text-white uppercase">${pk.name}</span><span class="w-2 h-2" style="background:${pk.accent}"></span></div><p class="text-[11px] text-[#7d9ab8] mb-2">${pk.desc}</p><span class="text-[10px] mono font-bold uppercase" style="color:${pk.accent}">PLAY PACK ▸</span>`;
+      b.addEventListener('click', () => {
+        const subset = PROMPTS.filter(p => p.pack === pk.id);
+        const full7 = subset.length >= 7 ? subset.slice(0, 7) : [...subset, ...seededShuffle(PROMPTS.filter(p => p.pack !== pk.id), Date.now() & 0xffff)].slice(0, 7);
+        startDive({ mode: 'pack', title: pk.name.toUpperCase(), prompts: full7 });
+      });
+      g.appendChild(b);
+    });
+  }
+
+  function wireSwitch(btnId, key) {
+    const btn = $(btnId);
+    const sync = () => { btn.classList.toggle('on', Boolean(settings[key])); btn.querySelector('.retro-switch-knob').textContent = settings[key] ? 'ON' : 'OFF'; };
+    sync(); btn.addEventListener('click', () => { audio.unlock(); audio.playBubble(settings[key] ? 440 : 580); settings[key] = !settings[key]; sync(); });
+  }
+
+  function wireEvents() {
+    renderPixelWord('KRILLION', 'logoShadow', 'logoFace', 380, 7, 11, false);
+    renderPixelWord('KRILLION', 'pufferLogoShadow', 'pufferLogoFace', 380, 7, 11, false);
+    renderPixelWord('MENU', 'menuLogoShadow', 'menuLogoFace', 180, 5, 8, true);
+
+    $('homePufferIcon').src = PUFFER_SPRITE_SRC;
+    $('menuPufferImg').src = PUFFER_SPRITE_SRC;
+    $('lobbyPufferSprite').src = PUFFER_SPRITE_SRC;
+    $('pufferStageSprite').src = PUFFER_SPRITE_SRC;
+
+    const openMenuModal = () => { audio.unlock(); audio.playBubble(520); closeAllModals(); $('menuModal').classList.remove('hidden'); };
+    const openSkinsModal = () => { audio.unlock(); audio.playBubble(520); closeAllModals(); renderSkinsModal(); $('skinsModal').classList.remove('hidden'); };
+    const openSettingsModal = () => { audio.unlock(); audio.playBubble(520); closeAllModals(); $('settingsModal').classList.remove('hidden'); };
+
+    $('menuToggleBtn').addEventListener('click', openMenuModal);
+    $('playMenuBtn').addEventListener('click', openMenuModal);
+    $('skinsMenuBtn').addEventListener('click', openMenuModal);
+    $('settingsMenuBtn').addEventListener('click', openMenuModal);
+    $('menuCloseBtn').addEventListener('click', closeAllModals);
+
+    $('topSkinsBtn').addEventListener('click', openSkinsModal);
+    $('openSkinsFromProfile').addEventListener('click', openSkinsModal);
+    $('skinsCloseBtn').addEventListener('click', closeAllModals);
+
+    $('topSettingsBtn').addEventListener('click', openSettingsModal);
+    $('settingsCloseBtn').addEventListener('click', closeAllModals);
+    $('settingsMyKrillionBtn').addEventListener('click', () => {
+      $('statBestDepth').textContent = `-${(store.bestDepth || 0).toLocaleString()}m`;
+      $('statTotalDives').textContent = String(store.totalDives || 0);
+      $('statStreak').textContent = `${store.streak || 1}d`;
+      switchView('mykrillion');
+    });
+    $('settingsRestoreBtn').addEventListener('click', () => showToast('Local profile synced'));
+    $('setPrivBtn').addEventListener('click', () => showToast('All dives stay local on your device'));
+    $('setIgBtn').addEventListener('click', () => showToast('Official: krillion.io'));
+    $('menuChainleBtn').addEventListener('click', () => showToast('Chainle · word association game'));
+
+    const toggleMute = () => {
+      audio.unlock(); audio.setMuted(!audio.muted);
+      $('iconSoundOn').classList.toggle('hidden', audio.muted);
+      $('iconSoundOff').classList.toggle('hidden', !audio.muted);
+      if (!audio.muted) audio.playBubble(580);
+    };
+    $('soundToggleBtn').addEventListener('click', toggleMute);
+    $('playSoundBtn').addEventListener('click', toggleMute);
+
+    wireSwitch('swLowPower', 'lowPower');
+    wireSwitch('swColorblind', 'colorblind');
+    wireSwitch('swCorrections', 'corrections');
+    wireSwitch('swClearRejected', 'clearRejected');
+    wireSwitch('swShareLink', 'shareLink');
+    wireSwitch('swAmbience', 'ambience');
+
+
+    $('startDailyBtn').addEventListener('click', () => startDive({ mode: 'daily', title: `DIVE #${TODAY_DIVE_NUM}`, diveNum: TODAY_DIVE_NUM, prompts: getDivePromptsForNumber(TODAY_DIVE_NUM) }));
+    $('startPufferBtn').addEventListener('click', () => { renderPufferLobby(); switchView('pufferLobby'); });
+    $('homeArchiveBtn').addEventListener('click', () => { renderArchive(); switchView('archive'); });
+    $('homePacksBtn').addEventListener('click', () => { renderPacks(); switchView('packs'); });
+    $('homeUnlimitedBtn').addEventListener('click', () => startDive({ mode: 'unlimited', title: 'UNLIMITED', prompts: seededShuffle(PROMPTS, Date.now() & 0xffff) }));
+    $('homeHowBtn').addEventListener('click', () => { audio.unlock(); audio.playBubble(480); switchView('how'); });
+    $('homePrivacyBtn').addEventListener('click', () => showToast('All dives stay local on your device'));
+
+    $('hostPufferRoomBtn').addEventListener('click', () => {
+      const code = Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 24)]).join('');
+      startPufferParty(code, 'Coral');
+    });
+    $('toggleRoomPublicBtn').addEventListener('click', () => {
+      roomIsPublic = !roomIsPublic;
+      $('toggleRoomPublicBtn').textContent = roomIsPublic ? 'PUBLIC · LISTED' : 'PRIVATE · CODE ONLY';
+      $('roomPublicHint').textContent = roomIsPublic ? 'anyone can join from the list' : 'only friends with code can join';
+      audio.playBubble(500);
+    });
+    $('joinCodeForm').addEventListener('submit', e => {
+      e.preventDefault(); const code = ($('joinCodeInput').value || '').trim().toUpperCase();
+      if (code.length < 3) { showToast('Enter a 4-letter room code'); return; }
+      startPufferParty(code, 'Host');
+    });
+
+    document.querySelectorAll('[data-nav]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const t = btn.getAttribute('data-nav');
+        if (t === 'daily') startDive({ mode: 'daily', title: `DIVE #${TODAY_DIVE_NUM}`, diveNum: TODAY_DIVE_NUM, prompts: getDivePromptsForNumber(TODAY_DIVE_NUM) });
+        else if (t === 'unlimited') startDive({ mode: 'unlimited', title: 'UNLIMITED', prompts: seededShuffle(PROMPTS, Date.now() & 0xffff) });
+        else if (t === 'pufferLobby') { renderPufferLobby(); switchView('pufferLobby'); }
+        else if (t === 'archive') { renderArchive(); switchView('archive'); }
+        else if (t === 'packs') { renderPacks(); switchView('packs'); }
+        else if (t === 'settings') openSettingsModal();
+        else if (t === 'mykrillion') {
+          $('statBestDepth').textContent = `-${(store.bestDepth || 0).toLocaleString()}m`;
+          $('statTotalDives').textContent = String(store.totalDives || 0);
+          $('statStreak').textContent = `${store.streak || 1}d`;
+          switchView('mykrillion');
+        } else switchView(t);
+      });
+    });
+
+    $('answerForm').addEventListener('submit', e => { e.preventDefault(); handleAnswerSubmit(); });
+    $('descendNextBtn').addEventListener('click', handleDescendOrSurface);
+    $('endUnlimitedBtn').addEventListener('click', finishDive);
+    $('shareResultBtn').addEventListener('click', copyShareCard);
+    $('replayOrNextBtn').addEventListener('click', () => startDive({ mode: 'unlimited', title: 'UNLIMITED', prompts: seededShuffle(PROMPTS, Date.now() & 0xffff) }));
+
+    $('pufferForm').addEventListener('submit', e => {
+      e.preventDefault(); const v = $('pufferInput').value.trim(); if (!v) return;
+      $('pufferInput').value = ''; handlePufferSubmission(v, false);
+    });
+    $('pufferRestartBtn').addEventListener('click', () => startPufferParty(puffer.roomCode, 'Coral'));
+
+    setInterval(() => {
+      if (game.view === 'home') {
+        const count = 10520 + Math.floor(Math.sin(Date.now() * 0.0007) * 18 + Math.random() * 6);
+        $('livePlayingCount').textContent = `${count.toLocaleString()} playing`;
+      }
+    }, 3500);
+
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && game.view === 'play' && game.phase === 'reveal') { e.preventDefault(); handleDescendOrSurface(); }
+      if (e.key === 'Escape') closeAllModals();
+    });
+  }
+
+
+  // =========================================================================
+  // REAL-TIME SOCKET.IO MULTIPLAYER CLIENT (Non-blocking async load)
+  // =========================================================================
+  let netSocket = null;
+  let netOnline = false;
+  let netRoomState = null;
+  let livePublicRooms = null;
+
+  function connectSocketIO() {
+    if (typeof window.io !== 'function') return;
+    try {
+      netSocket = window.io({ transports: ['websocket', 'polling'], reconnectionAttempts: 8 });
+      netSocket.on('connect', () => {
+        netOnline = true;
+        if ($('onlineStatusBadge')) {
+          $('onlineStatusBadge').textContent = '● LIVE ONLINE';
+          $('onlineStatusBadge').style.color = '#34d399';
+        }
+        netSocket.emit('list_rooms');
+      });
+      netSocket.on('disconnect', () => {
+        netOnline = false;
+        if ($('onlineStatusBadge')) {
+          $('onlineStatusBadge').textContent = 'RECONNECTING...';
+          $('onlineStatusBadge').style.color = '#fbbf24';
+        }
+      });
+      netSocket.on('public_rooms', ({ rooms, onlineCount }) => {
+        livePublicRooms = rooms || [];
+        if (typeof onlineCount === 'number' && $('livePlayingCount')) {
+          $('livePlayingCount').textContent = `${onlineCount} online`;
+        }
+        if (game.view === 'pufferLobby') renderOnlinePublicRooms();
+      });
+      netSocket.on('room_error', ({ msg }) => showToast(msg || 'Room error'));
+      netSocket.on('puffer_reject', ({ msg }) => { audio.playNoEcho(); $('pufferEventLog').textContent = msg; });
+      netSocket.on('answer_accepted', ({ tierKey }) => audio.playTierReward(tierKey || 'schooler'));
+      netSocket.on('puffer_pop', () => {
+        audio.playPufferPop();
+        scene.trauma = Math.min(1, scene.trauma + 0.85);
+        $('pufferStageSprite').style.transform = 'scale(1.8)';
+        setTimeout(() => { $('pufferStageSprite').style.transform = 'scale(1)'; }, 900);
+      });
+      netSocket.on('fuse_tick', ({ fuse, maxFuse, inflation }) => {
+        if (game.view !== 'puffer' || !netRoomState) return;
+        const r = Math.max(0, fuse / Math.max(1, maxFuse));
+        $('pufferFuseText').textContent = `Fuse: ${fuse.toFixed(1)}s`;
+        $('pufferFuseBar').style.width = `${r * 100}%`;
+        $('pufferFuseBar').style.backgroundColor = r < 0.3 ? '#f43f5e' : (r < 0.6 ? '#fbbf24' : '#50e0f8');
+        $('pufferStageSprite').style.transform = `scale(${Math.max(0.85, Math.min(1.65, inflation + (1 - r) * 0.45)).toFixed(3)})`;
+      });
+      netSocket.on('room_state', state => {
+        netRoomState = state;
+        if (game.view !== 'puffer') switchView('puffer');
+        renderOnlinePufferRoom(state);
+      });
+    } catch (err) { console.error('Socket init error:', err); }
+  }
+
+  function loadSocketScriptAsync() {
+    if (typeof window.io === 'function') { connectSocketIO(); return; }
+    const sc = document.createElement('script');
+    sc.src = '/socket.io/socket.io.js';
+    sc.async = true;
+    sc.onload = () => connectSocketIO();
+    sc.onerror = () => {
+      if ($('onlineStatusBadge')) $('onlineStatusBadge').textContent = 'OFFLINE · BOTS';
+    };
+    document.head.appendChild(sc);
+  }
+
+  function renderOnlinePublicRooms() {
+    if (!netOnline || !livePublicRooms) return;
+    const list = $('publicRoomsList'); list.innerHTML = '';
+    if (livePublicRooms.length === 0) {
+      list.innerHTML = '<div class="py-4 text-center text-xs text-[#6d8ba8]">No public rooms yet — click HOST A ROOM to create one!</div>';
+      return;
+    }
+    livePublicRooms.forEach(rm => {
+      const row = document.createElement('div');
+      row.className = 'py-3 flex items-center justify-between gap-3';
+      row.innerHTML = `<div class="flex items-center gap-3 min-w-0"><span class="text-sm font-black mono tracking-[0.16em] ${rm.full ? 'text-[#44637d]' : 'text-[#50e0f8]'}">${rm.code}</span><div class="truncate"><div class="text-xs font-bold text-[#e6f3ff] truncate">${rm.host}</div><div class="text-[10px] text-[#5e7c99] uppercase">${rm.cur}/${rm.max} · ${rm.status}</div></div></div>${rm.full ? '<span class="text-[10px] font-bold text-[#48637d] uppercase">FULL</span>' : '<button class="join-live-btn px-3 py-1.5 text-[11px] font-black text-[#e6557e] hover:text-white uppercase">JOIN ▸</button>'}`;
+      const btn = row.querySelector('.join-live-btn');
+      if (btn) btn.addEventListener('click', () => {
+        audio.unlock(); audio.playBubble(580);
+        const pn = ($('pufferPlayerName').value || '').trim() || 'Diver';
+        netSocket.emit('join_room', { code: rm.code, name: pn, skin: store.selectedSkin });
+      });
+      list.appendChild(row);
+    });
+  }
+
+  function renderOnlinePufferRoom(st) {
+    const isHost = netSocket && st.hostId === netSocket.id;
+    $('pufferRoomBadge').textContent = `ONLINE ROOM · ${st.code}`;
+    $('pufferCopyCodeBtn').classList.remove('hidden');
+    $('pufferAddBotBtn').classList.toggle('hidden', !isHost || st.status === 'playing' || st.players.length >= 6);
+    $('pufferStartOnlineBtn').classList.toggle('hidden', !isHost || st.status === 'playing');
+    $('pufferStartOnlineBtn').textContent = st.status === 'finished' ? 'Play Again' : 'Start';
+    $('pufferRestartBtn').classList.add('hidden');
+
+    const wrap = $('pufferPlayers'); wrap.innerHTML = '';
+    st.players.forEach((pl, i) => {
+      const isT = i === st.turnIdx && st.status === 'playing';
+      const el = document.createElement('div');
+      el.className = `p-2.5 border ${isT ? 'bg-[#122b44] border-[#50e0f8]' : 'bg-[#06111e] border-[#16293f]'} ${pl.hearts <= 0 ? 'opacity-40' : ''}`;
+      el.innerHTML = `<div class="text-[11px] font-bold truncate ${isT ? 'text-[#50e0f8]' : 'text-[#cce4f7]'}">${pl.name}${pl.id === st.hostId ? ' ★' : ''}</div><div class="flex gap-1 mt-1.5">${Array.from({length:3},(_,idx)=>`<span class="inline-block w-2 h-2 ${idx<pl.hearts?'bg-[#e6557e]':'bg-[#1e3247]'}"></span>`).join('')}</div>`;
+      wrap.appendChild(el);
+    });
+
+    if (st.status === 'lobby') {
+      $('pufferTurnLabel').textContent = isHost ? 'WAITING IN LOBBY · SHARE CODE & PRESS START' : 'WAITING FOR HOST TO START...';
+      $('pufferPromptTitle').textContent = `Room Code: ${st.code}`;
+      $('pufferFuseText').textContent = `${st.players.length}/6 players`;
+      $('pufferFuseBar').style.width = '100%';
+      $('pufferInput').disabled = true; $('pufferSubmitBtn').disabled = true;
+    } else if (st.status === 'finished') {
+      $('pufferTurnLabel').textContent = `${st.winner || 'PLAYER'} WINS!`;
+      $('pufferPromptTitle').textContent = 'MATCH COMPLETE';
+      $('pufferInput').disabled = true; $('pufferSubmitBtn').disabled = true;
+    } else {
+      const cur = st.players[st.turnIdx];
+      const myTurn = cur && netSocket && cur.id === netSocket.id;
+      $('pufferTurnLabel').textContent = myTurn ? 'YOUR TURN — PASS!' : `${cur ? cur.name : 'Player'}'s turn...`;
+      $('pufferPromptTitle').textContent = st.promptQ;
+      $('pufferInput').disabled = !myTurn; $('pufferSubmitBtn').disabled = !myTurn;
+      if (myTurn) $('pufferInput').focus();
+    }
+
+    $('pufferEventLog').textContent = st.log || '';
+    const usedWrap = $('pufferUsedWrap'); usedWrap.innerHTML = '';
+    (st.used || []).forEach(u => {
+      const chip = document.createElement('span');
+      chip.className = 'px-2 py-0.5 text-[10px] font-bold bg-[#06111e] border text-[#cce4f7]';
+      chip.style.borderColor = u.color || '#50e0f8';
+      chip.textContent = u.word;
+      usedWrap.appendChild(chip);
+    });
+  }
+
+  function wireOnlineOverrides() {
+    $('pufferCopyCodeBtn').addEventListener('click', () => {
+      if (!netRoomState) return;
+      const code = netRoomState.code;
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(() => showToast(`Copied room code ${code}`)).catch(() => fallbackCopy(code));
+      else fallbackCopy(code);
+    });
+    $('pufferAddBotBtn').addEventListener('click', () => { if (netSocket && netOnline) netSocket.emit('add_bot'); });
+    $('pufferStartOnlineBtn').addEventListener('click', () => { if (netSocket && netOnline) netSocket.emit('start_match'); });
+    $('pufferLeaveBtn').addEventListener('click', () => {
+      if (netSocket && netOnline) { netSocket.emit('leave_room'); netRoomState = null; }
+      renderPufferLobby();
+      if (netOnline) renderOnlinePublicRooms();
+      switchView('pufferLobby');
+    });
+    $('hostPufferRoomBtn').addEventListener('click', e => {
+      if (!netOnline || !netSocket) return;
+      e.stopImmediatePropagation();
+      audio.unlock(); audio.playBubble(580);
+      const pn = ($('pufferPlayerName').value || '').trim() || 'Diver';
+      netSocket.emit('create_room', { name: pn, skin: store.selectedSkin, isPublic: roomIsPublic });
+    }, true);
+    $('joinCodeForm').addEventListener('submit', e => {
+      if (!netOnline || !netSocket) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const code = ($('joinCodeInput').value || '').trim().toUpperCase();
+      if (code.length < 3) { showToast('Enter a 4-letter room code'); return; }
+      const pn = ($('pufferPlayerName').value || '').trim() || 'Diver';
+      netSocket.emit('join_room', { code, name: pn, skin: store.selectedSkin });
+    }, true);
+    $('pufferForm').addEventListener('submit', e => {
+      if (!netOnline || !netSocket || !netRoomState) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const v = $('pufferInput').value.trim(); if (!v) return;
+      $('pufferInput').value = '';
+      netSocket.emit('submit_puffer', { answer: v });
+    }, true);
+    $('startPufferBtn').addEventListener('click', () => {
+      if (netOnline && netSocket) { netSocket.emit('list_rooms'); setTimeout(renderOnlinePublicRooms, 80); }
+    });
+  }
+
+  // Boot immediately (never wait for window.load so sky, logo & sprites render in <50ms!)
+  (function bootApp() {
+    try { wireEvents(); } catch (e) { console.error('wireEvents:', e); }
+    try { wireOnlineOverrides(); } catch (e) { console.error('wireOnline:', e); }
+    try { requestAnimationFrame(renderScene); } catch (e) { console.error('renderScene:', e); }
+    try { loadSocketScriptAsync(); } catch (e) { console.error('socketLoad:', e); }
+  })();
+
+})();
+</script>
+</body>
+</html>
