@@ -131,8 +131,20 @@ function getPublicRoomList() {
   return list;
 }
 
+function getRealPufferPlayingCount() {
+  let count = 0;
+  for (const room of rooms.values()) {
+    count += room.players.filter(player => !player.isBot).length;
+  }
+  return count;
+}
+
 function broadcastPublicRooms() {
-  io.emit('public_rooms', { rooms: getPublicRoomList(), onlineCount: io.engine.clientsCount });
+  io.emit('public_rooms', {
+    rooms: getPublicRoomList(),
+    onlineCount: io.engine.clientsCount,
+    pufferPlayingCount: getRealPufferPlayingCount()
+  });
 }
 
 function serializeRoom(r) {
@@ -176,7 +188,9 @@ function startNextRound(r) {
   }
   r.status = 'playing';
   r.winner = null;
-  r.prompt = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+  const promptPool = PROMPTS.filter(prompt => prompt !== r.prompt);
+  const availablePrompts = promptPool.length ? promptPool : PROMPTS;
+  r.prompt = availablePrompts[Math.floor(Math.random() * availablePrompts.length)];
   r.used = new Set();
   r.usedDisplay = [];
   r.maxFuse = 13 + Math.random() * 5;
@@ -225,10 +239,12 @@ function scheduleBotIfNeeded(r) {
   }, 1500 + Math.random() * 1800);
 }
 
-function processSubmission(r, playerId, rawAnswer) {
+function processSubmission(r, playerId, rawAnswer, playerUid) {
   if (r.status !== 'playing') return { ok: false, msg: 'Match not active' };
   const cur = r.players[r.turnIdx];
-  if (!cur || cur.id !== playerId) return { ok: false, msg: 'Not your turn' };
+  if (!cur || (cur.id !== playerId && (!playerUid || cur.uid !== playerUid))) {
+    return { ok: false, msg: 'Not your turn' };
+  }
 
   const ev = evaluateAnswer(r.prompt, rawAnswer);
   if (!ev.matched) return { ok: false, msg: `"${(rawAnswer || '').trim()}": no echo. try again` };
@@ -256,19 +272,27 @@ function processSubmission(r, playerId, rawAnswer) {
 }
 
 io.on('connection', socket => {
-  socket.emit('public_rooms', { rooms: getPublicRoomList(), onlineCount: io.engine.clientsCount });
+  socket.emit('public_rooms', {
+    rooms: getPublicRoomList(),
+    onlineCount: io.engine.clientsCount,
+    pufferPlayingCount: getRealPufferPlayingCount()
+  });
   broadcastPublicRooms();
 
   socket.on('list_rooms', () => {
-    socket.emit('public_rooms', { rooms: getPublicRoomList(), onlineCount: io.engine.clientsCount });
+    socket.emit('public_rooms', {
+      rooms: getPublicRoomList(),
+      onlineCount: io.engine.clientsCount,
+      pufferPlayingCount: getRealPufferPlayingCount()
+    });
   });
 
-  socket.on('create_room', ({ name, skin, isPublic } = {}) => {
+  socket.on('create_room', ({ name, skin, isPublic, uid } = {}) => {
     leaveCurrentRoom(socket);
     const code = genRoomCode();
     const room = {
       code, hostId: socket.id, isPublic: isPublic !== false, maxPlayers: 6, status: 'lobby',
-      players: [{ id: socket.id, name: (name || '').trim().slice(0, 18) || 'Diver', skin: skin || 'krill', isBot: false, hearts: 3 }],
+      players: [{ id: socket.id, uid: uid || socket.id, name: (name || '').trim().slice(0, 18) || 'Diver', skin: skin || 'krill', isBot: false, hearts: 3 }],
       turnIdx: 0, prompt: null, used: new Set(), usedDisplay: [], fuse: 14, maxFuse: 14, inflation: 1, log: 'Waiting for players...'
     };
     rooms.set(code, room);
@@ -278,13 +302,13 @@ io.on('connection', socket => {
     broadcastPublicRooms();
   });
 
-  socket.on('join_room', ({ code, name, skin } = {}) => {
+  socket.on('join_room', ({ code, name, skin, uid } = {}) => {
     const cleanCode = (code || '').trim().toUpperCase();
     const room = rooms.get(cleanCode);
     if (!room) { socket.emit('room_error', { msg: `Room ${cleanCode} not found` }); return; }
     if (room.players.length >= room.maxPlayers) { socket.emit('room_error', { msg: `Room ${cleanCode} is full` }); return; }
     leaveCurrentRoom(socket);
-    room.players.push({ id: socket.id, name: (name || '').trim().slice(0, 18) || 'Diver', skin: skin || 'krill', isBot: false, hearts: 3 });
+    room.players.push({ id: socket.id, uid: uid || socket.id, name: (name || '').trim().slice(0, 18) || 'Diver', skin: skin || 'krill', isBot: false, hearts: 3 });
     socket.join(cleanCode);
     socket.data.roomCode = cleanCode;
     room.log = `${room.players[room.players.length - 1].name} joined the reef!`;
@@ -316,10 +340,10 @@ io.on('connection', socket => {
     broadcastPublicRooms();
   });
 
-  socket.on('submit_puffer', ({ answer } = {}) => {
+  socket.on('submit_puffer', ({ answer, uid } = {}) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room) return;
-    const res = processSubmission(room, socket.id, answer);
+    const res = processSubmission(room, socket.id, answer, uid);
     if (!res.ok) socket.emit('puffer_reject', { msg: res.msg });
   });
 

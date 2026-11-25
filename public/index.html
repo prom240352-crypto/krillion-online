@@ -201,7 +201,7 @@
       <button id="startPufferBtn" class="cyan-box w-full px-4 py-4 flex items-center justify-between text-left">
         <span class="beta-tab">BETA · LIMITED TIME</span>
         <span class="flex items-center gap-3"><img id="homePufferIcon" src="/sprites/puffer.png" alt="Puffer" class="w-9 h-9 object-contain pixel-art" /><span class="text-[16px] sm:text-[18px] font-bold tracking-[0.22em] text-[#eef6ff] uppercase">PUFFER PARTY</span></span>
-        <span class="flex items-center gap-1.5 text-[11px] text-[#7c9ab8] shrink-0"><span class="inline-block w-1.5 h-1.5 bg-[#50e0f8]"></span><span id="livePlayingCount" class="mono">10,534 playing</span></span>
+        <span class="flex items-center gap-1.5 text-[11px] text-[#7c9ab8] shrink-0"><span class="inline-block w-1.5 h-1.5 bg-[#50e0f8]"></span><span id="livePlayingCount" class="mono">0 playing</span></span>
       </button>
       <button id="startDailyBtn" class="cyan-box w-full py-4 px-4 flex items-center justify-center gap-4">
         <span class="text-[12px] text-[#eef6ff]">▼</span><span class="text-[16px] sm:text-[18px] font-bold tracking-[0.24em] text-[#eef6ff] uppercase">BEGIN DESCENT</span><span class="text-[12px] text-[#eef6ff]">▼</span>
@@ -759,18 +759,16 @@
     if (best) return { matched: true, corrected: true, tier: best.tier, canonical: best.canonical };
     return { matched: false, corrected: false, tier: TIERS_BASE.miss, canonical: rawInput.trim() };
   }
-  function seededShuffle(arr, seed) {
-    const copy = arr.slice(); let s = seed >>> 0;
+  function randomShuffle(arr) {
+    const copy = arr.slice();
     for (let i = copy.length - 1; i > 0; i--) {
-      s = (s * 1664525 + 1013904223) >>> 0;
-      const j = s % (i + 1);
+      const j = Math.floor(Math.random() * (i + 1));
       [copy[i], copy[j]] = [copy[j], copy[i]];
     }
     return copy;
   }
   function getDivePromptsForNumber(diveNum) {
-    if (diveNum === 132) return PROMPTS.slice(0, 7);
-    return seededShuffle(PROMPTS, diveNum * 31337).slice(0, 7);
+    return randomShuffle(PROMPTS).slice(0, 7);
   }
 
   // =========================================================================
@@ -1823,7 +1821,7 @@
     }
     game.index++;
     if (game.mode === 'unlimited' && game.index >= game.prompts.length) {
-      game.prompts = game.prompts.concat(seededShuffle(PROMPTS, Date.now() & 0xffff));
+      game.prompts = game.prompts.concat(randomShuffle(PROMPTS));
     }
     beginPromptCountdown(false);
   }
@@ -2060,7 +2058,10 @@
     stopPufferLoop();
     const alive = puffer.players.filter(p => p.hearts > 0);
     if (alive.length <= 1) { renderPufferPlayers(); $('pufferTurnLabel').textContent = alive[0] ? `${alive[0].name} WINS!` : 'MATCH OVER'; $('pufferEventLog').textContent = 'Click Rematch or Lobby.'; $('pufferInput').disabled = true; $('pufferSubmitBtn').disabled = true; return; }
-    puffer.active = true; puffer.prompt = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+    puffer.active = true;
+    const promptPool = PROMPTS.filter(prompt => prompt !== puffer.prompt);
+    const availablePrompts = promptPool.length ? promptPool : PROMPTS;
+    puffer.prompt = availablePrompts[Math.floor(Math.random() * availablePrompts.length)];
     puffer.used = new Set(); puffer.maxFuse = 12 + Math.random() * 5; puffer.fuse = puffer.maxFuse; puffer.inflation = 1;
     while (puffer.players[puffer.turnIdx].hearts <= 0) puffer.turnIdx = (puffer.turnIdx + 1) % puffer.players.length;
     $('pufferPromptTitle').textContent = puffer.prompt.q; $('pufferUsedWrap').innerHTML = ''; $('pufferEventLog').textContent = 'Name a fresh answer to pass!';
@@ -2143,7 +2144,9 @@
       b.innerHTML = `<div class="flex items-center justify-between mb-1"><span class="text-xs font-black text-white uppercase">${pk.name}</span><span class="w-2 h-2" style="background:${pk.accent}"></span></div><p class="text-[11px] text-[#7d9ab8] mb-2">${pk.desc}</p><span class="text-[10px] mono font-bold uppercase" style="color:${pk.accent}">PLAY PACK ▸</span>`;
       b.addEventListener('click', () => {
         const subset = PROMPTS.filter(p => p.pack === pk.id);
-        const full7 = subset.length >= 7 ? subset.slice(0, 7) : [...subset, ...seededShuffle(PROMPTS.filter(p => p.pack !== pk.id), Date.now() & 0xffff)].slice(0, 7);
+        const full7 = subset.length >= 7
+          ? randomShuffle(subset).slice(0, 7)
+          : [...randomShuffle(subset), ...randomShuffle(PROMPTS.filter(p => p.pack !== pk.id))].slice(0, 7);
         startDive({ mode: 'pack', title: pk.name.toUpperCase(), prompts: full7 });
       });
       g.appendChild(b);
@@ -2214,7 +2217,7 @@
     $('startPufferBtn').addEventListener('click', () => { renderPufferLobby(); switchView('pufferLobby'); });
     $('homeArchiveBtn').addEventListener('click', () => { renderArchive(); switchView('archive'); });
     $('homePacksBtn').addEventListener('click', () => { renderPacks(); switchView('packs'); });
-    $('homeUnlimitedBtn').addEventListener('click', () => startDive({ mode: 'unlimited', title: 'UNLIMITED', prompts: seededShuffle(PROMPTS, Date.now() & 0xffff) }));
+    $('homeUnlimitedBtn').addEventListener('click', () => startDive({ mode: 'unlimited', title: 'UNLIMITED', prompts: randomShuffle(PROMPTS) }));
     $('homeHowBtn').addEventListener('click', () => { audio.unlock(); audio.playBubble(480); switchView('how'); });
     $('homePrivacyBtn').addEventListener('click', () => showToast('All dives stay local on your device'));
 
@@ -2238,7 +2241,7 @@
       btn.addEventListener('click', () => {
         const t = btn.getAttribute('data-nav');
         if (t === 'daily') startDive({ mode: 'daily', title: `DIVE #${TODAY_DIVE_NUM}`, diveNum: TODAY_DIVE_NUM, prompts: getDivePromptsForNumber(TODAY_DIVE_NUM) });
-        else if (t === 'unlimited') startDive({ mode: 'unlimited', title: 'UNLIMITED', prompts: seededShuffle(PROMPTS, Date.now() & 0xffff) });
+        else if (t === 'unlimited') startDive({ mode: 'unlimited', title: 'UNLIMITED', prompts: randomShuffle(PROMPTS) });
         else if (t === 'pufferLobby') { renderPufferLobby(); switchView('pufferLobby'); }
         else if (t === 'archive') { renderArchive(); switchView('archive'); }
         else if (t === 'packs') { renderPacks(); switchView('packs'); }
@@ -2256,20 +2259,13 @@
     $('descendNextBtn').addEventListener('click', handleDescendOrSurface);
     $('endUnlimitedBtn').addEventListener('click', finishDive);
     $('shareResultBtn').addEventListener('click', copyShareCard);
-    $('replayOrNextBtn').addEventListener('click', () => startDive({ mode: 'unlimited', title: 'UNLIMITED', prompts: seededShuffle(PROMPTS, Date.now() & 0xffff) }));
+    $('replayOrNextBtn').addEventListener('click', () => startDive({ mode: 'unlimited', title: 'UNLIMITED', prompts: randomShuffle(PROMPTS) }));
 
     $('pufferForm').addEventListener('submit', e => {
       e.preventDefault(); const v = $('pufferInput').value.trim(); if (!v) return;
       $('pufferInput').value = ''; handlePufferSubmission(v, false);
     });
     $('pufferRestartBtn').addEventListener('click', () => startPufferParty(puffer.roomCode, 'Coral'));
-
-    setInterval(() => {
-      if (game.view === 'home') {
-        const count = 10520 + Math.floor(Math.sin(Date.now() * 0.0007) * 18 + Math.random() * 6);
-        $('livePlayingCount').textContent = `${count.toLocaleString()} playing`;
-      }
-    }, 3500);
 
     window.addEventListener('keydown', e => {
       if (e.key === 'Enter' && game.view === 'play' && game.phase === 'reveal') { e.preventDefault(); handleDescendOrSurface(); }
@@ -2285,6 +2281,7 @@
   let netOnline = false;
   let netRoomState = null;
   let livePublicRooms = null;
+  const myClientUid = 'u_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now().toString(36);
 
   function connectSocketIO() {
     if (typeof window.io !== 'function') return;
@@ -2305,10 +2302,14 @@
           $('onlineStatusBadge').style.color = '#fbbf24';
         }
       });
-      netSocket.on('public_rooms', ({ rooms, onlineCount }) => {
+      netSocket.on('public_rooms', ({ rooms, onlineCount, pufferPlayingCount }) => {
         livePublicRooms = rooms || [];
-        if (typeof onlineCount === 'number' && $('livePlayingCount')) {
-          $('livePlayingCount').textContent = `${onlineCount} online`;
+        if ($('livePlayingCount')) {
+          $('livePlayingCount').textContent = `${(pufferPlayingCount || 0).toLocaleString()} playing`;
+        }
+        if ($('onlineStatusBadge')) {
+          $('onlineStatusBadge').textContent = `● LIVE · ${onlineCount || 1} ONLINE`;
+          $('onlineStatusBadge').style.color = '#34d399';
         }
         if (game.view === 'pufferLobby') renderOnlinePublicRooms();
       });
@@ -2364,7 +2365,7 @@
       if (btn) btn.addEventListener('click', () => {
         audio.unlock(); audio.playBubble(580);
         const pn = ($('pufferPlayerName').value || '').trim() || 'Diver';
-        netSocket.emit('join_room', { code: rm.code, name: pn, skin: store.selectedSkin });
+        netSocket.emit('join_room', { code: rm.code, name: pn, skin: store.selectedSkin, uid: myClientUid });
       });
       list.appendChild(row);
     });
@@ -2400,10 +2401,14 @@
       $('pufferInput').disabled = true; $('pufferSubmitBtn').disabled = true;
     } else {
       const cur = st.players[st.turnIdx];
-      const myTurn = cur && netSocket && cur.id === netSocket.id;
+      const myTurn = Boolean(cur && ((netSocket && cur.id === netSocket.id) || (cur.uid && cur.uid === myClientUid)));
       $('pufferTurnLabel').textContent = myTurn ? 'YOUR TURN — PASS!' : `${cur ? cur.name : 'Player'}'s turn...`;
       $('pufferPromptTitle').textContent = st.promptQ;
-      $('pufferInput').disabled = !myTurn; $('pufferSubmitBtn').disabled = !myTurn;
+      $('pufferInput').disabled = false; $('pufferInput').readOnly = false;
+      $('pufferSubmitBtn').disabled = !myTurn;
+      $('pufferSubmitBtn').textContent = myTurn ? 'PASS' : 'WAIT';
+      $('pufferSubmitBtn').style.opacity = myTurn ? '1' : '0.45';
+      $('pufferInput').placeholder = myTurn ? 'Type your answer...' : 'Get ready to pass...';
       if (myTurn) $('pufferInput').focus();
     }
 
@@ -2438,7 +2443,7 @@
       e.stopImmediatePropagation();
       audio.unlock(); audio.playBubble(580);
       const pn = ($('pufferPlayerName').value || '').trim() || 'Diver';
-      netSocket.emit('create_room', { name: pn, skin: store.selectedSkin, isPublic: roomIsPublic });
+      netSocket.emit('create_room', { name: pn, skin: store.selectedSkin, isPublic: roomIsPublic, uid: myClientUid });
     }, true);
     $('joinCodeForm').addEventListener('submit', e => {
       if (!netOnline || !netSocket) return;
@@ -2446,14 +2451,14 @@
       const code = ($('joinCodeInput').value || '').trim().toUpperCase();
       if (code.length < 3) { showToast('Enter a 4-letter room code'); return; }
       const pn = ($('pufferPlayerName').value || '').trim() || 'Diver';
-      netSocket.emit('join_room', { code, name: pn, skin: store.selectedSkin });
+      netSocket.emit('join_room', { code, name: pn, skin: store.selectedSkin, uid: myClientUid });
     }, true);
     $('pufferForm').addEventListener('submit', e => {
       if (!netOnline || !netSocket || !netRoomState) return;
       e.preventDefault(); e.stopImmediatePropagation();
       const v = $('pufferInput').value.trim(); if (!v) return;
       $('pufferInput').value = '';
-      netSocket.emit('submit_puffer', { answer: v });
+      netSocket.emit('submit_puffer', { answer: v, uid: myClientUid });
     }, true);
     $('startPufferBtn').addEventListener('click', () => {
       if (netOnline && netSocket) { netSocket.emit('list_rooms'); setTimeout(renderOnlinePublicRooms, 80); }
